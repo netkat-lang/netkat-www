@@ -3,10 +3,11 @@
 # KATch2 UI Build Script
 # Builds WASM files and copies them to the katch2ui directory
 
-# Multiple deployment directories
-DEPLOY_DIRS=(
-    "/Users/jules/git/netkat-www/"
-    "/Users/jules/git/julesjacobs.github.io/misc/katch2/"
+# Multiple deployment directories with their target subdirectories
+# Format: "repo_path:subdir" (use "." for top level)
+DEPLOY_TARGETS=(
+    "/Users/jules/git/netkat-www/:."
+    "/Users/jules/git/julesjacobs.github.io/:misc/katch2"
 )
 
 # Parse command line arguments
@@ -50,9 +51,17 @@ if [ $? -eq 0 ]; then
         echo "🚀 Deploying to multiple GitHub Pages directories..."
         
         # Deploy to each directory
-        for DEPLOY_DIR in "${DEPLOY_DIRS[@]}"; do
+        for DEPLOY_TARGET in "${DEPLOY_TARGETS[@]}"; do
+            IFS=':' read -r DEPLOY_DIR DEPLOY_SUBDIR <<< "$DEPLOY_TARGET"
+            
             echo ""
-            echo "📦 Deploying to: $DEPLOY_DIR"
+            if [ "$DEPLOY_SUBDIR" = "." ]; then
+                echo "📦 Deploying to: $DEPLOY_DIR (top level)"
+                FULL_DEPLOY_PATH="$DEPLOY_DIR"
+            else
+                echo "📦 Deploying to: $DEPLOY_DIR/$DEPLOY_SUBDIR"
+                FULL_DEPLOY_PATH="$DEPLOY_DIR/$DEPLOY_SUBDIR"
+            fi
             
             # Check if deployment directory exists
             if [ ! -d "$DEPLOY_DIR" ]; then
@@ -61,19 +70,25 @@ if [ $? -eq 0 ]; then
                 continue
             fi
             
-            echo "📦 Copying UI files to $DEPLOY_DIR..."
+            # Create subdirectory if it doesn't exist and we're not deploying to top level
+            if [ "$DEPLOY_SUBDIR" != "." ]; then
+                mkdir -p "$FULL_DEPLOY_PATH"
+                echo "📁 Created/ensured subdirectory: $DEPLOY_SUBDIR"
+            fi
+            
+            echo "📦 Copying UI files to $FULL_DEPLOY_PATH..."
             
             # Copy the entire ui folder contents to the deployment directory
-            cp -r ui/* "$DEPLOY_DIR/"
+            cp -r ui/* "$FULL_DEPLOY_PATH/"
             
             # Remove .gitignore from pkg directory to allow WASM files to be committed
-            if [ -f "$DEPLOY_DIR/katch2ui/pkg/.gitignore" ]; then
-                rm "$DEPLOY_DIR/katch2ui/pkg/.gitignore"
+            if [ -f "$FULL_DEPLOY_PATH/katch2ui/pkg/.gitignore" ]; then
+                rm "$FULL_DEPLOY_PATH/katch2ui/pkg/.gitignore"
                 echo "🗑️  Removed .gitignore from pkg directory to allow WASM files to be committed"
             fi
             
             if [ $? -eq 0 ]; then
-                echo "✅ Successfully deployed to: $DEPLOY_DIR"
+                echo "✅ Successfully deployed to: $FULL_DEPLOY_PATH"
                 
                 # Navigate to the GitHub Pages repo and commit changes
                 echo "🔄 Committing and pushing changes to repository at $DEPLOY_DIR..."
@@ -96,7 +111,11 @@ if [ $? -eq 0 ]; then
                     
                     # Create a commit with timestamp
                     TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
-                    git commit -m "Update KATch2 tutorial - $TIMESTAMP"
+                    if [ "$DEPLOY_SUBDIR" = "." ]; then
+                        git commit -m "Update KATch2 tutorial - $TIMESTAMP"
+                    else
+                        git commit -m "Update KATch2 tutorial in $DEPLOY_SUBDIR - $TIMESTAMP"
+                    fi
                     
                     if [ $? -eq 0 ]; then
                         # Push to remote
@@ -115,7 +134,7 @@ if [ $? -eq 0 ]; then
                 # Return to the original directory
                 cd - > /dev/null
             else
-                echo "❌ Failed to deploy files to $DEPLOY_DIR"
+                echo "❌ Failed to deploy files to $FULL_DEPLOY_PATH"
             fi
         done
         
@@ -124,7 +143,8 @@ if [ $? -eq 0 ]; then
         
     else
         echo "🚀 Ready to deploy! Run with --deploy to copy to multiple GitHub Pages directories:"
-        for DEPLOY_DIR in "${DEPLOY_DIRS[@]}"; do
+        for DEPLOY_TARGET in "${DEPLOY_TARGETS[@]}"; do
+            IFS=':' read -r DEPLOY_DIR DEPLOY_SUBDIR <<< "$DEPLOY_TARGET"
             echo "   - $DEPLOY_DIR"
         done
         echo "   Or manually copy the ui/ directory."
