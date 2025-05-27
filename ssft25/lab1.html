@@ -186,13 +186,25 @@
 </head>
 <body>
     <div class="container">
-        <h1>
+      <h1>
             <img src="assets/katch2-logo-black.webp" alt="KATch2 Logo">
-            KATch<sup style="font-size: 0.6em">2</sup> NetKAT Tutorial
+            Lab 1
         </h1>
         
-        <p style="text-align: center">This tutorial will guide you through the basics of NetKAT.</p>
-
+        <p>This lab consists of a few pencil-and-paper Kleene Algebra exercises and an interactive tutorial that introduces the basic features of NetKAT.</p>
+        <h2>Kleene Algebra Exercises</h2>
+	<ul>
+	  <li><p>Prove that the axiom <code>p·1 ≡ p</code> is sound for 2 x 2 matrices over a Kleene Algebra</li>
+	  <li><p>Prove that the axiom <code>p·(q + r) ≡ p·q + p·r</code> is sound for the tropical Kleene Algebra</li>
+	  <li><p>Prove the following relationships, using the axioms of Kleene Algebra and derived theorems:
+	      <ul>
+		<li><code>x ≤ x*</code> and <code>1 ≤ x*</code></li>
+		<li><code>(a + b)* ≤ (a*·b)*·a*</code></li>
+		<li><code>x·x* ≡ x*·x</code></li>
+	      </ul>
+	  </li>
+	</ul>
+	
         <h2>Packets and Variables</h2>
         <p>In NetKAT, a <strong>packet</strong> is represented as a sequence (or vector) of bits. We use variables like <code>x0</code>, <code>x1</code>, <code>x2</code>, and so on, to refer to these bits.
         For example, if a packet is <code>101</code>, then:</p>

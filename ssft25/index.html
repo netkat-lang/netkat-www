@@ -312,6 +312,15 @@
             font-size: 0.95em;
         }
 
+        .subtle a {
+            color: #007bff;
+            text-decoration: none;
+        }
+
+        .subtle a:hover {
+            text-decoration: underline;
+        }
+	
         .footer {
             background: #2c3e50;
             color: #ecf0f1;
@@ -363,103 +372,109 @@
     </style>
 </head>
 <body>
-    <div class="header">
-        <div class="header-content">
-        <h1>
-          <img src="assets/katch2-head.webp" alt="KATch Cat" class="cat-logo">
-	  Programming and Reasoning with Kleene Algebra with Tests
-        </h1>
-            <p class="subtitle">Nate Foster</p>
-            
-            <div class="nav-links">
-                <a href="#lectures" class="nav-link">🏫 Lectures</a>
-                <a href="#labs" class="nav-link">🧪 Labs</a>
-                <a href="#papers" class="nav-link">📚 Reading</a>
-                </a>
-            </div>
-        </div>
+  <div class="header">
+    <div class="header-content">
+      <h1>
+        <img src="assets/katch2-head.webp" alt="KATch Cat" class="cat-logo">
+	Programming and Reasoning with Kleene Algebra with Tests
+      </h1>
+      <p class="subtitle"><span class="subtle"><a href="https://www.cs.cornell.edu/~jnfoster/" target="_blank">Nate Foster</a></span> (Cornell University)</p>
+      
+      <div class="nav-links">
+        <a href="#lectures" class="nav-link">🏫 Lectures</a>
+        <a href="#labs" class="nav-link">🧪 Labs</a>
+        <a href="#papers" class="nav-link">📚 Reading</a>
+      </div>
     </div>
-
-    <div class="section">
-        <div class="container">
-          <div class="subsection">
-            <h2 id="papers">Lectures</h2>
-                <div class="papers-grid">
-                    <div class="paper">
-                        <h4>Lecture 1</h4>
-                        <p class="summary">An introduction to Kleene Algebra, Kleene Algebra with Tests, and NetKAT</p>
-			<p class="venue"><a href="lecture1.pdf" target="_blank">[PDF]</a></p>
-                    </div>
-                    <div class="paper">
-                        <h4>Lecture 2</h4>
-                        <p class="summary">An introduction to network verification with NetKAT</p>
-			<p class="venue"><a target="_blank">[Coming Soon]</a></p>
-                    </div>
-		</div>
-	  </div>
-          <div class="subsection">
-            <h2 id="papers">Labs</h2>
-	        <div class="papers-grid">
-                    <div class="paper">
-                      <h4>Lab 1</h4>
-                      <p class="summary">Hands on exercises with Kleene Algbera and NetKAT</p>
-		      <p class="venue"><a href="lab1.html" target="_blank">[Demo Site]</a></p>
-                    </div>
-                    <div class="paper">
-		      <h4>Lab 2</h4>
-                      <p class="summary">More hands-on exercises with NetKAT</p>
-		      <p class="venue"><a target="_blank">[Coming Soon]</a></p>
-                    </div>
-		</div>
-
-	  </div>
-          <div class="subsection">
-            <h2 id="papers">Reading</h2>                
-                <div class="papers-grid">
-                    <div class="paper">
-                        <h4><a href="https://doi.org/10.1145/3656454" target="_blank">KATch: A Fast Symbolic Verifier for NetKAT</a></h4>
-                        <p class="authors">Mark Moeller, Jules Jacobs, Olivier Savary Belanger, David Darais, Cole Schlesinger, Steffen Smolka, Nate Foster, Alexandra Silva</p>
-                        <p class="venue">PLDI 2024 • <a href="https://doi.org/10.1145/3656454" target="_blank">DOI</a></p>
-                        <p class="summary">Introduces KATch, a tool for fast symbolic verification of NetKAT programs, enabling efficient checking of program equivalence and other properties using symbolic automata techniques.</p>
-                    </div>
-
-                    <div class="paper">
-                        <h4><a href="https://doi.org/10.1145/3371129" target="_blank">Guarded Kleene Algebra with Tests: Verification of Uninterpreted Programs in Nearly Linear Time</a></h4>
-                        <p class="authors">Steffen Smolka, Nate Foster, Justin Hsu, Tobias Kappé, Dexter Kozen, Alexandra Silva</p>
-                        <p class="venue">POPL 2020 • <a href="https://doi.org/10.1145/3371129" target="_blank">DOI</a></p>
-                        <p class="summary">Introduces Guarded Kleene Algebra with Tests (GKAT), an efficient framework for verifying program equivalence based on the so-called guarded fragment of KAT.</p>
-                    </div>
-		    
-                    <div class="paper">
-                        <h4><a href="https://doi.org/10.1145/2784731.2784761" target="_blank">A Fast Compiler for NetKAT</a></h4>
-                        <p class="authors">Steffen Smolka, Spiridon Eliopoulos, Nate Foster, Arjun Guha</p>
-                        <p class="venue">ICFP 2015 • <a href="https://doi.org/10.1145/2784731.2784761" target="_blank">DOI</a></p>
-                        <p class="summary">Presents a high-performance compiler for NetKAT that handles complex features like regular paths and virtual networks, significantly improving compilation times with optimizations like symbolic automata representations.</p>
-                    </div>
-
-                    <div class="paper">
-                        <h4><a href="https://doi.org/10.1145/2676726.2677011" target="_blank">A Coalgebraic Decision Procedure for NetKAT</a></h4>
-                        <p class="authors">Nate Foster, Dexter Kozen, Mae Milano, Alexandra Silva, Laure Thompson</p>
-                        <p class="venue">POPL 2015 • <a href="https://doi.org/10.1145/2676726.2677011" target="_blank">DOI</a></p>
-                        <p class="summary">Presents a new algorithm for deciding equivalence of NetKAT programs by constructing finite automata (policy automata) for NetKAT terms. Despite NetKAT's equational theory being PSPACE-complete, shows the procedure is efficient in practice.</p>
-                    </div>
-
-                    <div class="paper">
-                        <h4><a href="https://doi.org/10.1145/2535838.2535862" target="_blank">NetKAT: Semantic Foundations for Networks</a></h4>
-                        <p class="authors">Carolyn Jane Anderson, Nate Foster, Arjun Guha, Jean-Baptiste Jeannin, Dexter Kozen, Cole Schlesinger, David Walker</p>
-                        <p class="venue">POPL 2014 • <a href="https://doi.org/10.1145/2535838.2535862" target="_blank">DOI</a></p>
-                        <p class="summary">Introduces NetKAT, a network programming language grounded in Kleene Algebra with Tests (KAT), providing a sound and complete equational theory for reasoning about network behavior.</p>
-                    </div>
-
-                    <div class="paper">
-                        <h4><a href="https://doi.org/10.1007/978-3-319-12736-1_1" target="_blank">NetKAT – A Formal System for the Verification of Networks</a></h4>
-                        <p class="authors">Dexter Kozen</p>
-                        <p class="venue">APLAS 2014 • <a href="https://doi.org/10.1007/978-3-319-12736-1_1" target="_blank">DOI</a></p>
-                        <p class="summary">An accessible survey and tutorial of NetKAT's design and theory, providing a self-contained introduction to NetKAT's syntax, semantics, and equational reasoning principles.</p>
-                    </div>
-                </div>
-            </div>
+  </div>
+  <div class="section">
+    <div class="container">
+      <h2>Acknowledgments</h2>
+      <p class="intro-text">These materials have developed over many years with all of the contributors to the <span class="subtle"><a href="https://netkat.org" target="_blank">NetKAT</a></span> project, but especially <span class="subtle"><a href="https://julesjacobs.com" target="_blank">Jules Jacobs</a></span>, <span class="subtle"><a href="https://www.cs.cornell.edu/~kozen/" target="_blank">Dexter Kozen</a></span>, and <span class="subtle"><a href="https://alexandrasilva.org" target="_blank">Alexandra Silva</a></span>.
+    </div>
+  </div>
+  <div class="section">
+    <div class="container">
+      <h2>Abstract</h2>
+      <p class="intro-text">Kleene algebra with tests (KAT) is an algebraic framework that can be used to reason about imperative programs. It has been applied across a wide variety of areas including program transformations, concurrency control, compiler optimizations, cache control, networking, and more. These lectures will provide an overview of Kleene Algebra with Tests, including the syntax, semantics, and the coalgebraic theory underlying decision procedures for program equivalence. We will illustrate how it can be used as a core framework for network verification, including successful extensions and fundamental limitations.</p>
+    </div>
+  </div>
+  <div class="section">
+    <div class="container">
+      <h2 id="lectures">Lectures</h2>
+      <div class="papers-grid">
+	<div class="paper">
+          <h4>Lecture 1</h4>
+          <p class="summary">An introduction to Kleene Algebra, Kleene Algebra with Tests, and NetKAT</p>
+	  <p class="venue"><a href="lecture1.pdf" target="_blank">[PDF]</a></p>
 	</div>
+	<div class="paper">
+          <h4>Lecture 2</h4>
+          <p class="summary">An introduction to network verification with NetKAT</p>
+	  <p class="venue"><a target="_blank">[Coming Soon]</a></p>
+	</div>
+      </div>
     </div>
+  </div>
+  <div class="section">
+    <div class="container">
+      <h2 id="labs">Labs</h2>
+      <div class="papers-grid">
+        <div class="paper">
+          <h4>Lab 1</h4>
+          <p class="summary">Hands on exercises with Kleene Algbera and NetKAT</p>
+	  <p class="venue"><a href="lab1.html" target="_blank">[Demo Site]</a></p>
+        </div>
+        <div class="paper">
+	  <h4>Lab 2</h4>
+          <p class="summary">More hands-on exercises with NetKAT</p>
+	  <p class="venue"><a target="_blank">[Coming Soon]</a></p>
+        </div>
+      </div>  
+    </div>
+  </div>
+  <div class="section">
+    <div class="container">
+      <h2 id="reading">Reading</h2>                
+      <div class="papers-grid">
+	<div class="paper">
+          <h4><a href="https://doi.org/10.1145/3656454" target="_blank">KATch: A Fast Symbolic Verifier for NetKAT</a></h4>
+          <p class="authors">Mark Moeller, Jules Jacobs, Olivier Savary Belanger, David Darais, Cole Schlesinger, Steffen Smolka, Nate Foster, Alexandra Silva</p>
+          <p class="venue">PLDI 2024 • <a href="https://doi.org/10.1145/3656454" target="_blank">DOI</a></p>
+          <p class="summary">Introduces KATch, a tool for fast symbolic verification of NetKAT programs, enabling efficient checking of program equivalence and other properties using symbolic automata techniques.</p>
+	</div>      
+	<div class="paper">
+          <h4><a href="https://doi.org/10.1145/3371129" target="_blank">Guarded Kleene Algebra with Tests: Verification of Uninterpreted Programs in Nearly Linear Time</a></h4>
+          <p class="authors">Steffen Smolka, Nate Foster, Justin Hsu, Tobias Kappé, Dexter Kozen, Alexandra Silva</p>
+          <p class="venue">POPL 2020 • <a href="https://doi.org/10.1145/3371129" target="_blank">DOI</a></p>
+          <p class="summary">Introduces Guarded Kleene Algebra with Tests (GKAT), an efficient framework for verifying program equivalence based on the so-called guarded fragment of KAT.</p>
+	</div>      
+	<div class="paper">
+          <h4><a href="https://doi.org/10.1145/2784731.2784761" target="_blank">A Fast Compiler for NetKAT</a></h4>
+          <p class="authors">Steffen Smolka, Spiridon Eliopoulos, Nate Foster, Arjun Guha</p>
+          <p class="venue">ICFP 2015 • <a href="https://doi.org/10.1145/2784731.2784761" target="_blank">DOI</a></p>
+          <p class="summary">Presents a high-performance compiler for NetKAT that handles complex features like regular paths and virtual networks, significantly improving compilation times with optimizations like symbolic automata representations.</p>
+	</div>	
+	<div class="paper">
+          <h4><a href="https://doi.org/10.1145/2676726.2677011" target="_blank">A Coalgebraic Decision Procedure for NetKAT</a></h4>
+          <p class="authors">Nate Foster, Dexter Kozen, Mae Milano, Alexandra Silva, Laure Thompson</p>
+          <p class="venue">POPL 2015 • <a href="https://doi.org/10.1145/2676726.2677011" target="_blank">DOI</a></p>
+          <p class="summary">Presents a new algorithm for deciding equivalence of NetKAT programs by constructing finite automata (policy automata) for NetKAT terms. Despite NetKAT's equational theory being PSPACE-complete, shows the procedure is efficient in practice.</p>
+	</div>
+	<div class="paper">
+          <h4><a href="https://doi.org/10.1145/2535838.2535862" target="_blank">NetKAT: Semantic Foundations for Networks</a></h4>
+          <p class="authors">Carolyn Jane Anderson, Nate Foster, Arjun Guha, Jean-Baptiste Jeannin, Dexter Kozen, Cole Schlesinger, David Walker</p>
+          <p class="venue">POPL 2014 • <a href="https://doi.org/10.1145/2535838.2535862" target="_blank">DOI</a></p>
+          <p class="summary">Introduces NetKAT, a network programming language grounded in Kleene Algebra with Tests (KAT), providing a sound and complete equational theory for reasoning about network behavior.</p>
+	</div>      
+	<div class="paper">
+          <h4><a href="https://doi.org/10.1007/978-3-319-12736-1_1" target="_blank">NetKAT – A Formal System for the Verification of Networks</a></h4>
+          <p class="authors">Dexter Kozen</p>
+          <p class="venue">APLAS 2014 • <a href="https://doi.org/10.1007/978-3-319-12736-1_1" target="_blank">DOI</a></p>
+          <p class="summary">An accessible survey and tutorial of NetKAT's design and theory, providing a self-contained introduction to NetKAT's syntax, semantics, and equational reasoning principles.</p>
+	</div>
+      </div>
+    </div>
+  </div>
 </body>
 </html> 
