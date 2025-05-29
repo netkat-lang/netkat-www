@@ -180,21 +180,34 @@ class KATch2Editor {
 
         // Define syntax highlighting
         monaco.languages.setMonarchTokensProvider('netkat', {
-            keywords: ['dup', 'T', 'X', 'U', 'F', 'G', 'R'],
-            operators: [':=', '==', '+', '&', '^', '-', '!', ';', '*'],
+            keywords: ['dup', 'T', 'X', 'U', 'F', 'G', 'R', 'if', 'then', 'else', 'let', 'in'],
+            operators: [':=', '==', '+', '&', '^', '-', '~', '!', ';', '*', '..'],
             symbols: /[=><!~?:&|+\-*\/\^%;()]+/,
 
             tokenizer: {
                 root: [
                     [/\/\/.*/, 'comment'],
+                    // IP addresses (e.g., 192.168.1.1)
+                    [/\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/, 'number'],
+                    // Hexadecimal literals (e.g., 0xABCD)
+                    [/0x[0-9a-fA-F]+/, 'number'],
+                    // Binary literals (e.g., 0b1010)
+                    [/0b[01]+/, 'number'],
+                    // Decimal numbers
+                    [/\d+/, 'number'],
+                    // Variables (x followed by digits)
+                    [/x\d+/, 'variable.name'],
+                    // Bit range syntax (e.g., x[0..32])
+                    [/\[\d+\.\.\d+\]/, 'variable.name'],
+                    // Keywords and identifiers
                     [/[a-zA-Z_][\w_]*/, {
                         cases: { 
                             '@keywords': 'keyword',
                             '@default': 'identifier' 
                         }
                     }],
+                    // Simple 0/1 bits
                     [/[01]/, 'number'],
-                    [/x\d+/, 'variable.name'],
                     [/[()]/, '@brackets'],
                     [/@symbols/, {
                         cases: { 
@@ -261,6 +274,12 @@ class KATch2Editor {
                     this.replaceWithEditor(element, initialCode, lines, showLineNumbers, id, isExerciseAttr, isExampleAttr);
                 }
             }
+        });
+        
+        // Also transform <nk> elements for syntax highlighting only
+        const nkElements = document.querySelectorAll('nk');
+        nkElements.forEach(element => {
+            this.replaceWithHighlightedCode(element);
         });
     }
 
@@ -1157,35 +1176,106 @@ class KATch2Editor {
                 i = end;
                 matched = true;
             }
-            // Check for keywords
+            // Check for variables (x followed by digits) vs standalone x FIRST
+            else if (code[i] === 'x') {
+                if (i + 1 < code.length && /\d/.test(code[i + 1])) {
+                    // x followed by digits (x3, x0, x1, etc.) - variable
+                    let start = i;
+                    i++; // skip 'x'
+                    while (i < code.length && /\d/.test(code[i])) {
+                        i++;
+                    }
+                    tokens.push({ type: 'variable', text: code.substring(start, i) });
+                    matched = true;
+                } else {
+                    // standalone x (e.g., in x[0..32]) - identifier
+                    tokens.push({ type: 'identifier', text: 'x' });
+                    i++;
+                    matched = true;
+                }
+            }
+            // Check for keywords and other identifiers
             else if (/[a-zA-Z_]/.test(code[i])) {
                 let start = i;
                 while (i < code.length && /[a-zA-Z_0-9]/.test(code[i])) {
                     i++;
                 }
                 const word = code.substring(start, i);
-                if (['dup', 'T', 'X', 'U', 'F', 'G', 'R'].includes(word)) {
+                if (['dup', 'T', 'X', 'U', 'F', 'G', 'R', 'if', 'then', 'else', 'let', 'in'].includes(word)) {
                     tokens.push({ type: 'keyword', text: word });
                 } else {
                     tokens.push({ type: 'identifier', text: word });
                 }
                 matched = true;
             }
-            // Check for variables (x followed by digits)
-            else if (code[i] === 'x' && i + 1 < code.length && /\d/.test(code[i + 1])) {
+            // Check for IP addresses (e.g., 192.168.1.1)
+            else if (/\d/.test(code[i]) && i < code.length) {
                 let start = i;
-                i++; // skip 'x'
-                while (i < code.length && /\d/.test(code[i])) {
-                    i++;
+                // Try to match IP address pattern
+                let ipMatch = code.substring(i).match(/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/);
+                if (ipMatch) {
+                    tokens.push({ type: 'number', text: ipMatch[0] });
+                    i += ipMatch[0].length;
+                    matched = true;
                 }
-                tokens.push({ type: 'variable', text: code.substring(start, i) });
-                matched = true;
+                // Try to match hex literal (0x...)
+                else if (code.substr(i, 2) === '0x') {
+                    i += 2;
+                    while (i < code.length && /[0-9a-fA-F]/.test(code[i])) {
+                        i++;
+                    }
+                    tokens.push({ type: 'number', text: code.substring(start, i) });
+                    matched = true;
+                }
+                // Try to match binary literal (0b...)
+                else if (code.substr(i, 2) === '0b') {
+                    i += 2;
+                    while (i < code.length && /[01]/.test(code[i])) {
+                        i++;
+                    }
+                    tokens.push({ type: 'number', text: code.substring(start, i) });
+                    matched = true;
+                }
+                // Regular decimal number
+                else {
+                    while (i < code.length && /\d/.test(code[i])) {
+                        i++;
+                    }
+                    tokens.push({ type: 'number', text: code.substring(start, i) });
+                    matched = true;
+                }
             }
-            // Check for numbers (0 or 1)
-            else if (/[01]/.test(code[i])) {
-                tokens.push({ type: 'number', text: code[i] });
-                i++;
-                matched = true;
+            // Check for bit range syntax [digits..digits]
+            else if (code[i] === '[' && i + 1 < code.length) {
+                // Check if this looks like a bit range
+                let j = i + 1;
+                let isBitRange = false;
+                // Look for pattern [digits..digits]
+                if (/\d/.test(code[j])) {
+                    while (j < code.length && /\d/.test(code[j])) j++;
+                    if (j + 1 < code.length && code.substr(j, 2) === '..') {
+                        j += 2;
+                        if (j < code.length && /\d/.test(code[j])) {
+                            while (j < code.length && /\d/.test(code[j])) j++;
+                            if (j < code.length && code[j] === ']') {
+                                isBitRange = true;
+                                j++;
+                            }
+                        }
+                    }
+                }
+                
+                if (isBitRange) {
+                    // Token the entire [0..32] as variable.name to match Monaco
+                    tokens.push({ type: 'variable', text: code.substring(i, j) });
+                    i = j;
+                    matched = true;
+                } else {
+                    // Just a regular bracket
+                    tokens.push({ type: 'brackets', text: '[' });
+                    i++;
+                    matched = true;
+                }
             }
             // Check for operators
             else if (code.substr(i, 2) === ':=' || code.substr(i, 2) === '==') {
@@ -1193,13 +1283,13 @@ class KATch2Editor {
                 i += 2;
                 matched = true;
             }
-            else if (['+', '&', '^', '-', '!', ';', '*'].includes(code[i])) {
+            else if (['+', '&', '^', '-', '~', ';', '*'].includes(code[i])) {
                 tokens.push({ type: 'operator', text: code[i] });
                 i++;
                 matched = true;
             }
-            // Check for brackets
-            else if (['(', ')'].includes(code[i])) {
+            // Check for square brackets only (parens will be black/default)
+            else if (['[', ']'].includes(code[i])) {
                 tokens.push({ type: 'brackets', text: code[i] });
                 i++;
                 matched = true;
@@ -1255,6 +1345,41 @@ class KATch2Editor {
             .netkat-identifier { color: #996600; }
         `;
         document.head.appendChild(style);
+    }
+
+    // Replace <nk> element with syntax-highlighted code (no editor)
+    replaceWithHighlightedCode(element) {
+        // Add syntax highlighting styles to the page
+        this.addNetKATSyntaxStyles();
+        
+        const code = element.textContent.trim();
+        const showLineNumbers = element.hasAttribute('show-line-numbers');
+        
+        // Create a span to replace the nk element
+        const codeSpan = document.createElement('span');
+        codeSpan.className = 'netkat-highlighted';
+        codeSpan.style.cssText = `
+            font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+            font-size: 14px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        `;
+        
+        // Apply syntax highlighting
+        if (showLineNumbers) {
+            const lines = code.split('\n');
+            const numberedLines = lines.map((line, index) => {
+                const lineNumber = (index + 1).toString().padStart(2, ' ');
+                const highlightedLine = this.highlightNetKATCode(line);
+                return `<span class="line-number" style="color: #999; user-select: none;">${lineNumber} | </span>${highlightedLine}`;
+            }).join('\n');
+            codeSpan.innerHTML = numberedLines;
+        } else {
+            codeSpan.innerHTML = this.highlightNetKATCode(code);
+        }
+        
+        // Replace the original element
+        element.parentNode.replaceChild(codeSpan, element);
     }
 }
 
