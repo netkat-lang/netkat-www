@@ -245,13 +245,17 @@ class KATch2Editor {
     transformElements(selector) {
         const elements = document.querySelectorAll(selector); // E.g., 'netkat' or 'pre.netkat'
         elements.forEach(element => {
+            const isKleeneAttr = element.getAttribute('kleene');
             const isExerciseAttr = element.getAttribute('exercise');
             const isExampleAttr = element.getAttribute('example');
             const targetId = element.getAttribute('target');
             const initialCode = element.textContent.trim(); // Solution if exercise loader, or code if editor
             const id = element.getAttribute('id') || this.generateUniqueId('keditor-');
 
-            if (isExerciseAttr && targetId) {
+	    if (isKleeneAttr) {
+                lines = Math.max(1, initialCode.split('\n').length);
+		this.replaceWithKleeneEditor(element, initialCode, lines, id, isExerciseAttr);
+	    } else if (isExerciseAttr && targetId) {
                 // This element is an EXERCISE LOADER for another editor
                 this.createExerciseLoaderUI(element, isExerciseAttr, initialCode, targetId);
             } else {
@@ -283,6 +287,121 @@ class KATch2Editor {
         });
     }
 
+    replaceWithKleeneEditor(element, initialCode, lines, id, exerciseDescriptionText, exampleDescriptionText) {
+        const height = Math.max(50, lines * 22 + 30);
+        const targetSolution = initialCode;
+        const editorInitialCode = 'Type your solution here\n';
+        
+        const wrapper = document.createElement('div');
+        wrapper.className = 'katch2-editor-wrapper';
+        wrapper.style.cssText = `position: relative; margin-bottom: 10px;`;
+        if (id) wrapper.id = id;
+
+        // Create unified container with all styling
+        const unifiedContainer = document.createElement('div');
+        unifiedContainer.style.cssText = `
+            border: 1px solid #e1e5e9;
+            border-radius: 4px;
+            box-shadow: 0 3px 7px rgba(0,0,0,0.15);
+            transition: border-color 0.3s ease, box-shadow 0.3s ease;
+            overflow: hidden;
+        `;
+
+        // Exercise description (optional top section)
+        const exerciseDescriptionElement = document.createElement('div');
+        exerciseDescriptionElement.className = 'katch2-exercise-description';
+        exerciseDescriptionElement.style.cssText = `
+            padding: 10px 120px 10px 15px;
+            background-color: #eaf2f8;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-size: 0.98em;
+            color: #2c3e50;
+            display: ${isExercise ? 'block' : 'none'};
+            border-bottom: ${isExercise ? '1px solid #aed6f1' : 'none'};
+        `;
+	exerciseDescriptionElement.innerHTML = `<strong>Exercise:</strong> ${this.htmlEscape(exerciseDescriptionText)}`;
+
+        // Editor container (middle section - no individual styling)
+        const container = document.createElement('div');
+        container.style.cssText = `
+            width: 100%; 
+            height: ${height}px;
+            background: white;
+        `;
+
+        // Show solution button (positioned over the unified container)
+        const showSolutionButton = document.createElement('button');
+        showSolutionButton.className = 'katch2-show-solution';
+        showSolutionButton.innerHTML = 'Show Solution';
+        showSolutionButton.style.cssText = `
+            position: absolute;
+            top: 8px;
+            right: 10px;
+            z-index: 10;
+            background: linear-gradient(135deg, #6c757d, #5a6268);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 6px 12px;
+            font-size: 12px;
+            font-weight: 600;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(108,117,125,0.3);
+            transition: all 0.2s ease;
+            opacity: 0.9;
+            display: ${isExercise ? 'block' : 'none'};
+        `;
+
+        // Add hover effects for show solution button
+        showSolutionButton.addEventListener('mouseenter', () => {
+            showSolutionButton.style.opacity = '1';
+            showSolutionButton.style.transform = 'translateY(-1px)';
+            showSolutionButton.style.boxShadow = '0 3px 8px rgba(108,117,125,0.4)';
+            unifiedContainer.style.borderColor = '#6c757d';
+            unifiedContainer.style.boxShadow = '0 3px 7px rgba(108,117,125,0.25)';
+        });
+        showSolutionButton.addEventListener('mouseleave', () => {
+            showSolutionButton.style.opacity = '0.9';
+            showSolutionButton.style.transform = 'translateY(0)';
+            showSolutionButton.style.boxShadow = '0 2px 4px rgba(108,117,125,0.3)';
+            unifiedContainer.style.borderColor = '#e1e5e9';
+            unifiedContainer.style.boxShadow = '0 3px 7px rgba(0,0,0,0.15)';
+        });
+
+        // KATch logo (positioned in upper right corner of the editor area)
+        const katchLogo = document.createElement('img');
+        kleeneLogo.src = 'assets/kleene-head.webp';
+        kleeneLogo.alt = 'Kleene';
+        kleeneLogo.className = 'katch2-editor-logo';
+        kleeneLogo.style.cssText = `
+            position: absolute;
+            bottom: 5px;
+            right: 5px;
+            z-index: 100;
+            height: 28px;
+            opacity: 0.8;
+            pointer-events: none;
+            transform: scaleX(-1);
+        `;
+
+        // Position the logo relative to the editor container
+        container.style.position = 'relative';
+        container.appendChild(kleeneLogo);
+
+        // Assemble the component
+        unifiedContainer.appendChild(exerciseDescriptionElement);
+        unifiedContainer.appendChild(exampleDescriptionElement);
+        unifiedContainer.appendChild(container);
+
+        wrapper.appendChild(unifiedContainer);
+        wrapper.appendChild(showSolutionButton);
+        element.parentNode.replaceChild(wrapper, element);
+        
+        this.createKleeneEditor(wrapper, container, exerciseDescriptionElement, editorInitialCode, false, false, id, isExercise, targetSolution, exerciseDescriptionText, null, null, showSolutionButton);
+	
+    }
+    
     replaceWithEditor(element, initialCode, lines = 1, showLineNumbers = false, id = null, exerciseDescriptionText = null, exampleDescriptionText = null) {
         const height = Math.max(50, lines * 22 + 30);
         const isExercise = exerciseDescriptionText !== null;
@@ -363,7 +482,7 @@ class KATch2Editor {
             display: ${isExercise ? 'none' : 'block'};
         `;
         resultArea.innerHTML = '<strong>Analysis:</strong> Waiting for input...';
-        
+
         // Exercise feedback area (bottom section for exercises)
         const exerciseFeedbackArea = document.createElement('div');
         exerciseFeedbackArea.className = 'katch2-exercise-feedback';
@@ -376,7 +495,7 @@ class KATch2Editor {
             display: none;
             border-top: 1px solid #e9ecef;
         `;
-
+	
         // Show solution button (positioned over the unified container)
         const showSolutionButton = document.createElement('button');
         showSolutionButton.className = 'katch2-show-solution';
@@ -441,7 +560,7 @@ class KATch2Editor {
         unifiedContainer.appendChild(exerciseDescriptionElement);
         unifiedContainer.appendChild(exampleDescriptionElement);
         unifiedContainer.appendChild(container);
-        unifiedContainer.appendChild(resultArea);
+	unifiedContainer.appendChild(resultArea);
         unifiedContainer.appendChild(exerciseFeedbackArea);
         
         wrapper.appendChild(unifiedContainer);
@@ -648,6 +767,71 @@ class KATch2Editor {
         };
         
         analyzeButton.addEventListener('mousedown', loadIntoTarget);
+    }
+
+    createKleeneEditor(customElementDOM, container, exerciseDescriptionElement, initialCode, showLineNumbers = false, readOnly = false, id = null, isExercise = false, targetSolution = null, exerciseDescriptionText = null, exampleDescriptionText = null, exampleDescriptionElement = null, showSolutionButton = null) {
+        const monaco = this.monacoInstance;
+        if (!id && customElementDOM && customElementDOM.id) id = customElementDOM.id; // Ensure ID if customElementDOM has one
+        else if (!id) id = this.generateUniqueId('keditor-'); // Generate if still no ID
+
+        if (customElementDOM && !customElementDOM.id) customElementDOM.id = id;
+        
+        // Ensure katch2ExerciseInfo is initialized on the customElementDOM (wrapper/custom tag)
+        if (customElementDOM) {
+            if (!customElementDOM.katch2ExerciseInfo) customElementDOM.katch2ExerciseInfo = {};
+            customElementDOM.katch2ExerciseInfo.isExercise = isExercise;
+            customElementDOM.katch2ExerciseInfo.targetSolution = targetSolution;
+            customElementDOM.katch2ExerciseInfo.exerciseDescriptionText = exerciseDescriptionText; // Store raw text
+            customElementDOM.katch2ExerciseInfo.exampleDescriptionText = exampleDescriptionText; // Store raw text
+            // Note: DOM elements for feedback/description are passed directly, not via katch2ExerciseInfo here
+        }
+        
+        const editor = monaco.editor.create(container, {
+            value: initialCode,
+            language: 'netkat',
+            automaticLayout: false, // Disabled to prevent infinite resize loop
+            minimap: { enabled: false },
+            scrollBeyondLastLine: false,
+            fontSize: 14,
+            theme: 'netkatTheme',
+            padding: { top: 10, bottom: 10 },
+            glyphMargin: false,
+            renderLineHighlight: "none",
+            roundedSelection: true,
+            overviewRulerLanes: 0,
+            overviewRulerBorder: false,
+            lineNumbers: showLineNumbers ? 'on' : 'off',
+            lineNumbersMinChars: showLineNumbers ? 3 : 0,
+            lineDecorationsWidth: showLineNumbers ? 5 : 0,
+            readOnly: readOnly,
+            // Disable intellisense/autocomplete features
+            quickSuggestions: false,
+            suggestOnTriggerCharacters: false,
+            wordBasedSuggestions: false,
+            parameterHints: { enabled: false },
+            hover: { enabled: false }
+        });
+
+        // Setup show solution button functionality for exercises
+        if (isExercise && showSolutionButton && targetSolution) {
+            showSolutionButton.addEventListener('mousedown', () => {
+                editor.setValue(targetSolution);
+                editor.focus();
+                // Position cursor at the end of the content
+                const model = editor.getModel();
+                const lineCount = model.getLineCount();
+                const lineLength = model.getLineMaxColumn(lineCount);
+                editor.setPosition({ lineNumber: lineCount, column: lineLength });
+            });
+        }
+
+        this.editorInstances.push({ 
+            editor, resultArea, id, 
+            isExercise, targetSolution, exerciseDescriptionText, exampleDescriptionText,
+            exerciseDescriptionElement, null, exampleDescriptionElement, showSolutionButton,
+            customElementDOM // This is the key: the wrapper div or <netkat-editor> tag
+        });
+        return editor;
     }
 
     createEditor(customElementDOM, container, resultArea, exerciseDescriptionElement, exerciseFeedbackArea, initialCode, showLineNumbers = false, readOnly = false, id = null, isExercise = false, targetSolution = null, exerciseDescriptionText = null, exampleDescriptionText = null, exampleDescriptionElement = null, showSolutionButton = null) {
