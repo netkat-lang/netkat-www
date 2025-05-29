@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Programming and Reasoning with KAT - Lab 1</title>
-    <link rel="icon" type="image/png" href="assets/favicon.png">
+    <link rel="icon" type="image/png" href="../assets/favicon.png">
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
@@ -188,7 +188,7 @@
     <div class="container">
 
       <h1>
-        <img src="assets/katch2-logo-black.webp" alt="KATch2 Logo">
+        <img src="../assets/katch2-logo-black.webp" alt="KATch2 Logo">
         Programming and Reasoning with KAT - Lab 1
       </h1>
         
@@ -199,7 +199,17 @@
 	<li><p>Prove that the axiom <code>p·(q + r) ≡ p·q + p·r</code> is sound for the tropical Kleene Algebra</li>
 	<li><p>Prove the following using Kleene Algebra:</p>
 	  <ul>
-	    <li><code>1 ≤ x*</code></li>
+	    <li><netkat kleene exercise="1 ≤ x*">
+1 + x*
+≡
+1 + (1 + x·x*)
+≡
+(1 + 1) + x·x*
+≡
+1 + x·x*
+≡
+x*	    
+</netkat></li>
 	    <li><code>x ≤ x*</code></li>
 	    <li><code>x*·x* ≡ x*</code></li>
 	    <li><code>x** ≡ x*</code></li>
@@ -1069,6 +1079,6 @@ let port = &x[64..80] in
     </div>
 
     <!-- Include the new KATch2 UI library -->
-    <script type="module" src="katch2ui/katch2-editor.js"></script>
+    <script type="module" src="../katch2ui/katch2-editor.js"></script>
 </body>
 </html> 
