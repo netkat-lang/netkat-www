@@ -441,30 +441,91 @@ let port = &x[64..80] in
           <li><code>dst</code> a 32-bit value encoding the packet's destination address.
 	</ul>
 <netkat example="Standard fictitious packet fields">
-let switch = &x[0..4] in
-let port = &x[4..8] in
+let sw = &x[0..4] in
+let pt = &x[4..8] in
 let src = &x[8..40] in
 let dst = &x[40..72] in
-switch = 0x1 & port = 0xF
+sw = 0x1 & pt = 0xF
 </netkat>
-  </div>
+</div>
 
-<netkat exercise="Write a NetKAT term that encodes the topology; for simplicity, don't use dup">
-// s1:p2 -> s2:p1
-if (switch = 0x1 & port = 0x2) then (switch := 0x2; port := 0x1)
-// s1:p3 -> s3:p1
-else if (switch = 0x1 & port = 0x3) then (switch := 0x3; port := 0x1)
-// s2:p1 -> s1:p2
-else if (switch = 0x2 & port = 0x1) then (switch := 0x1; port := 0x2)
-// s2:p3 -> s3:p2
-else if (switch = 0x2 & port = 0x3) then (switch := 0x3; port := 0x2)
-// s3:p1 -> s1:p3
-else if (switch = 0x3 & port = 0x1) then (switch := 0x1; port := 0x3)
-// s3:p2 -> s2:p2
-else if (switch = 0x3 & port = 0x2) then (switch := 0x2; port := 0x3)
-// impossible
-else 0
+<netkat exercise="Write a NetKAT term that encodes the topology (for simplicity, don't use dup)">
+let sw = &x[0..4] in
+let pt = &x[4..8] in
+let src = &x[8..40] in
+let dst = &x[40..72] in
+sw == 0x1 & pt == 0x2; sw := 0x2; pt := 0x1 + // s1:p2 -> s2:p1
+sw == 0x1 & pt == 0x3; sw := 0x3; pt := 0x1 + // s1:p3 -> s3:p1
+sw == 0x2 & pt == 0x1; sw := 0x1; pt := 0x2 + // s2:p1 -> s1:p2
+sw == 0x2 & pt == 0x3; sw := 0x3; pt := 0x2 + // s2:p3 -> s3:p2
+sw == 0x3 & pt == 0x1; sw := 0x1; pt := 0x3 + // s3:p1 -> s1:p3
+sw == 0x3 & pt == 0x2; sw := 0x2; pt := 0x3   // s3:p2 -> s2:p2
 </netkat>  
+
+<netkat exercise="Write a NetKAT term that encodes the program on switch 1">
+let sw = &x[0..4] in
+let pt = &x[4..8] in
+let src = &x[8..40] in
+let dst = &x[40..72] in
+sw == 0x1;
+(dst == 10.0.1.1; pt := 0x1 +
+ dst == 10.0.2.2; pt := 0x2 +  
+ dst == 10.0.3.3; pt := 0x3)
+</netkat>  
+
+<netkat exercise="Write a NetKAT term that encodes the program on switch 2">
+let sw = &x[0..4] in
+let pt = &x[4..8] in
+let src = &x[8..40] in
+let dst = &x[40..72] in
+sw == 0x2;
+(dst == 10.0.1.1; pt := 0x1 +
+ dst == 10.0.2.2; pt := 0x2 +  
+ dst == 10.0.3.3; pt := 0x3)
+</netkat>
+
+<netkat exercise="Write a NetKAT term that encodes the program on switch 3">
+let sw = &x[0..4] in
+let pt = &x[4..8] in
+let src = &x[8..40] in
+let dst = &x[40..72] in
+sw == 0x3;
+(dst == 10.0.1.1; pt := 0x1 +
+ dst == 10.0.2.2; pt := 0x2 +  
+ dst == 10.0.3.3; pt := 0x3)
+</netkat>
+
+<netkat exercise="Write a NetKAT term that encodes the entire network">
+let sw = &x[0..4] in
+let pt = &x[4..8] in
+let src = &x[8..40] in
+let dst = &x[40..72] in
+let topo =
+  sw == 0x1 & pt == 0x2; sw := 0x2; pt := 0x1 + // s1:p2 -> s2:p1
+  sw == 0x1 & pt == 0x3; sw := 0x3; pt := 0x1 + // s1:p3 -> s3:p1
+  sw == 0x2 & pt == 0x1; sw := 0x1; pt := 0x2 + // s2:p1 -> s1:p2
+  sw == 0x2 & pt == 0x3; sw := 0x3; pt := 0x2 + // s2:p3 -> s3:p2
+  sw == 0x3 & pt == 0x1; sw := 0x1; pt := 0x3 + // s3:p1 -> s1:p3
+  sw == 0x3 & pt == 0x2; sw := 0x2; pt := 0x3   // s3:p2 -> s2:p2 in
+let sw1 =
+  sw == 0x1;
+  (dst == 10.0.1.1; pt := 0x1 +
+   dst == 10.0.2.2; pt := 0x2 +  
+   dst == 10.0.3.3; pt := 0x3) in
+let sw2 =
+  sw == 0x2;
+  (dst == 10.0.1.1; pt := 0x1 +
+   dst == 10.0.2.2; pt := 0x2 +  
+   dst == 10.0.3.3; pt := 0x3) in
+let sw3 =
+  sw == 0x3;
+  (dst == 10.0.1.1; pt := 0x1 +
+   dst == 10.0.2.2; pt := 0x2 +  
+   dst == 10.0.3.3; pt := 0x3) in
+let switch = sw1 + sw2 + sw3 in
+let net = (switch; topo)* in
+net
+</netkat>
 
 <div class="github-link">
         <a href="https://github.com/julesjacobs/KATch2" target="_blank" rel="noopener noreferrer">
