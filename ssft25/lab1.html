@@ -202,7 +202,7 @@
 [ a b ]
 [ c d ]
 </netkat>
-<netkat kleene exercise="Prove that the axiom p·(q + r) ≡ p·q + p·r is sound for the tropical Kleene Algebra">
+<netkat kleene lines="10" exercise="Prove that the axiom p·(q + r) ≡ p·q + p·r is sound for the tropical Kleene Algebra">
 // We analyze two cases
 
 // Case 1: min(q,r) = q
@@ -232,7 +232,7 @@ p·q + p·r
 ≡ // Fixpoint
 x*	    
 </netkat>
-<netkat kleene exercise="Prove x ≤ x*">
+<netkat kleene lines="10" exercise="Prove x ≤ x*">
 x + x*
 ≡ // Fixpoint
 x + 1 + x·x*
@@ -254,7 +254,7 @@ x + 1 + x + x·x·x*
 x*
 </netkat>
 
-<netkat kleene exercise="Prove x*·x* ≡ x*">
+<netkat kleene lines="10" exercise="Prove x*·x* ≡ x*">
 // Prove inclusions in each direction
 
 // Lemma: x* ≤ x*·x*
@@ -277,7 +277,7 @@ x* + x*
 x*
 </netkat>
   
-<netkat kleene exercise="Prove x** ≡ x*">
+<netkat kleene lines="10" exercise="Prove x** ≡ x*">
 // Prove inclusions in each direction
 
 //Lemma: x* ≤ x**
@@ -319,7 +319,7 @@ x**·1 ≤ x*
 // Then, by Idempotence, we have
 x** ≤ x*
 </netkat>
-<netkat kleene exercise="Prove (a + b)* ≡ (a*·b)*·a*">
+<netkat kleene lines="10" exercise="Prove (a + b)* ≡ (a*·b)*·a*">
 //Lemma: (a*·b)*·a*  ≤ (a + b)*
 //See proof from Lecture 1 using mononoticity		       
 
@@ -344,7 +344,7 @@ b·a*·(b·a*)* ≤ (b·a*)* ≤ a*·(b·a*)*
 (a + b)* ≤ (a*·b)*·a*
 </netkat>  
 
-<netkat kleene exercise="Prove (p·q)*·p ≡ p·(q·p)*">
+<netkat kleene lines="10" exercise="Prove (p·q)*·p ≡ p·(q·p)*">
 //Prove inclusions in each direction
 //Lemma: p·(q·p)* ≤ (p·q)*·p
 //We first show: p + ((p· q)*· p)· (q·p) ≤ (p·q)*·p.
@@ -381,7 +381,7 @@ p·(q·p)*
 (p·q)*·p ≤ p·(q·p)*
 </netkat>
 
-<netkat kleene exercise="Prove b·p ≤ b·p·c iff b·p ≡ b·p·c">
+<netkat kleene lines="10" exercise="Prove b·p ≤ b·p·c iff b·p ≡ b·p·c">
 //Prove each implication separately  
 //For the forward implication, by
 c ≤ 1
@@ -391,7 +391,7 @@ b·p·c ≤ b·p.
 //The backward implication is trivial
 </netkat>  
 
-<netkat kleene exercise="Prove b·p ≡ b·p·c iff b·p·!c ≡ 0">
+<netkat kleene lines="10" exercise="Prove b·p ≡ b·p·c iff b·p·!c ≡ 0">
 //Prove each implication separately
 
 //For the forward implication
