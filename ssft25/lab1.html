@@ -232,7 +232,7 @@ p·q + p·r
 ≡ // Fixpoint
 x*	    
 </netkat>
-<netkat kleene exercise="x ≤ x*">
+<netkat kleene exercise="Prove <code>x ≤ x*</code>">
 x + x*
 ≡ // Fixpoint
 x + 1 + x·x*
@@ -254,7 +254,7 @@ x + 1 + x + x·x·x*
 x*
 </netkat>
 
-<netkat kleene exercise="x*·x* ≡ x*">
+<netkat kleene exercise="Prove <code>x*·x* ≡ x*</code>">
 // Prove inclusions in each direction
 
 // Lemma: x* ≤ x*·x*
@@ -277,7 +277,7 @@ x* + x*
 x*
 </netkat>
   
-<netkat kleene exercise="x** ≡ x*">
+<netkat kleene exercise="Prove <code>x** ≡ x*</code>">
 // Prove inclusions in each direction
 
 //Lemma: x* ≤ x**
@@ -319,7 +319,7 @@ x**·1 ≤ x*
 // Then, by Idempotence, we have
 x** ≤ x*
 </netkat>
-<netkat kleene exercise="(a + b)* ≡ (a*·b)*·a*">
+<netkat kleene exercise="Prove <code>(a + b)* ≡ (a*·b)*·a*</code>">
 //Lemma: (a*·b)*·a*  ≤ (a + b)*
 //See proof from Lecture 1 using mononoticity		       
 
@@ -344,7 +344,7 @@ b·a*·(b·a*)* ≤ (b·a*)* ≤ a*·(b·a*)*
 (a + b)* ≤ (a*·b)*·a*
 </netkat>  
 
-<netkat kleene exercise="(p·q)*·p ≡ p·(q·p)*">
+<netkat kleene exercise="Prove <code>(p·q)*·p ≡ p·(q·p)*</code>">
 //Prove inclusions in each direction
 //Lemma: p·(q·p)* ≤ (p·q)*·p
 //We first show: p + ((p· q)*· p)· (q·p) ≤ (p·q)*·p.
@@ -381,7 +381,7 @@ p·(q·p)*
 (p·q)*·p ≤ p·(q·p)*
 </netkat>
 
-<netkat kleene exercise="b·p ≤ b·p·c iff b·p ≡ b·p·c">
+<netkat kleene exercise="Prove <code>b·p ≤ b·p·c</code> iff <code>b·p ≡ b·p·c</code>">
 //Prove each implication separately  
 //For the forward implication, by
 c ≤ 1
@@ -391,7 +391,7 @@ bpc ≤ bp.
 //The backward implication is trivial
 </netkat>  
 
-<netkat kleene exercise="b·p ≡ b·p·c</code> iff <code>b·p·!c ≡ 0">
+<netkat kleene exercise="Prove <code>b·p ≡ b·p·c</code> iff <code>b·p·!c ≡ 0</code>">
 //Prove each implication separately
 
 //For the forward implication
