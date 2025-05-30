@@ -194,7 +194,7 @@
         
       <p style="text-align:center">This lab consists of a few pencil-and-paper Kleene Algebra exercises and an interactive tutorial that introduces the basic features of NetKAT.</p>
       <h2>Kleene Algebra Exercises</h2>
-<netkat kleene exercise="Prove that the axiom <code>p·1 ≡ p</code> is sound for 2 x 2 matrices over a Kleene Algebra">
+<netkat kleene exercise="Prove that the axiom p·1 ≡ p is sound for 2 x 2 matrices over a Kleene Algebra">
 // By the definition of 2x2 matrix multiplication we have
 [ a b ] · [ 1 0 ] = [ (a·1 + b·0) (a·0 + b·1) ]
 [ c d ]   [ 0 1 ]   [ (c·1 + d·0) (c·0 + d·1) ]
@@ -203,7 +203,7 @@
 [ a b ]
 [ c d ]
 </netkat>
-<netkat kleene exercise="Prove that the axiom <code>p·(q + r) ≡ p·q + p·r</code> is sound for the tropical Kleene Algebra">
+<netkat kleene exercise="Prove that the axiom p·(q + r) ≡ p·q + p·r is sound for the tropical Kleene Algebra">
 // We analyze two cases
 
 // Case 1: min(q,r) = q
@@ -222,7 +222,7 @@ p·q + p·r
 // Symmetric to the previous case
 </netkat>
 
-<netkat kleene exercise="Prove <code>1 ≤ x*</code>">
+<netkat kleene exercise="Prove 1 ≤ x*">
 1 + x*
 ≡ // Fixpoint
 1 + (1 + x·x*)
@@ -233,7 +233,7 @@ p·q + p·r
 ≡ // Fixpoint
 x*	    
 </netkat>
-<netkat kleene exercise="Prove <code>x ≤ x*</code>">
+<netkat kleene exercise="Prove x ≤ x*">
 x + x*
 ≡ // Fixpoint
 x + 1 + x·x*
@@ -255,7 +255,7 @@ x + 1 + x + x·x·x*
 x*
 </netkat>
 
-<netkat kleene exercise="Prove <code>x*·x* ≡ x*</code>">
+<netkat kleene exercise="Prove x*·x* ≡ x*">
 // Prove inclusions in each direction
 
 // Lemma: x* ≤ x*·x*
@@ -278,7 +278,7 @@ x* + x*
 x*
 </netkat>
   
-<netkat kleene exercise="Prove <code>x** ≡ x*</code>">
+<netkat kleene exercise="Prove x** ≡ x*">
 // Prove inclusions in each direction
 
 //Lemma: x* ≤ x**
@@ -320,7 +320,7 @@ x**·1 ≤ x*
 // Then, by Idempotence, we have
 x** ≤ x*
 </netkat>
-<netkat kleene exercise="Prove <code>(a + b)* ≡ (a*·b)*·a*</code>">
+<netkat kleene exercise="Prove (a + b)* ≡ (a*·b)*·a*">
 //Lemma: (a*·b)*·a*  ≤ (a + b)*
 //See proof from Lecture 1 using mononoticity		       
 
@@ -345,7 +345,7 @@ b·a*·(b·a*)* ≤ (b·a*)* ≤ a*·(b·a*)*
 (a + b)* ≤ (a*·b)*·a*
 </netkat>  
 
-<netkat kleene exercise="Prove <code>(p·q)*·p ≡ p·(q·p)*</code>">
+<netkat kleene exercise="Prove (p·q)*·p ≡ p·(q·p)*">
 //Prove inclusions in each direction
 //Lemma: p·(q·p)* ≤ (p·q)*·p
 //We first show: p + ((p· q)*· p)· (q·p) ≤ (p·q)*·p.
@@ -382,7 +382,7 @@ p·(q·p)*
 (p·q)*·p ≤ p·(q·p)*
 </netkat>
 
-<netkat kleene exercise="Prove <code>b·p ≤ b·p·c</code> iff <code>b·p ≡ b·p·c</code>">
+<netkat kleene exercise="Prove b·p ≤ b·p·c iff b·p ≡ b·p·c">
 //Prove each implication separately  
 //For the forward implication, by
 c ≤ 1
@@ -392,7 +392,7 @@ bpc ≤ bp.
 //The backward implication is trivial
 </netkat>  
 
-<netkat kleene exercise="Prove <code>b·p ≡ b·p·c</code> iff <code>b·p·!c ≡ 0</code>">
+<netkat kleene exercise="Prove b·p ≡ b·p·c iff b·p·!c ≡ 0">
 //Prove each implication separately
 
 //For the forward implication
