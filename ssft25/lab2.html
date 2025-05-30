@@ -435,10 +435,10 @@ let port = &x[64..80] in
 	<h2>Network Verification in NetKAT</h2>
 	For the rest of this tutorial, we will assume that packets have four fictitious headers:
 	<ul>
-	  <li><code>switch</code> a 4-bit value that encodes the switch where the packet is currently located, typically written in hexidecimal notation,</li>
-          </li><code>port</code> a 4-bit value that encodes the switch where the packet is currently located, typically written in hexidecimal notation,</li>
-          <li><code>src</code> a 32-bit value that encodes the source address, typically written as an IP address, and
-          <li><code>src</code> a 32-bit value that encodes the destination address, typically written as an IP address.
+	  <li><code>switch</code> a 4-bit value encoding the switch where the packet is located,</li>
+          </li><code>port</code> a 4-bit value encoding the port where the packet is located,</li>
+          <li><code>src</code> a 32-bit value encoding the packet's source address, and
+          <li><code>dst</code> a 32-bit value encoding the packet's destination address.
 	</ul>
 <netkat example="Standard fictitious packet fields">
 let switch = &x[0..4] in
