@@ -194,11 +194,34 @@
         
       <p style="text-align:center">This lab consists of a few pencil-and-paper Kleene Algebra exercises and an interactive tutorial that introduces the basic features of NetKAT.</p>
       <h2>Kleene Algebra Exercises</h2>
-      <ul>
-	<li><p>Prove that the axiom <code>p·1 ≡ p</code> is sound for 2 x 2 matrices over a Kleene Algebra</li>
-	<li><p>Prove that the axiom <code>p·(q + r) ≡ p·q + p·r</code> is sound for the tropical Kleene Algebra</li>
-	<li><p>Prove the following using Kleene Algebra:</p>
-<netkat kleene exercise="1 ≤ x*">
+<netkat kleene exercise="Prove that the axiom <code>p·1 ≡ p</code> is sound for 2 x 2 matrices over a Kleene Algebra">
+// By the definition of 2x2 matrix multiplication we have
+[ a b ] · [ 1 0 ] = [ (a·1 + b·0) (a·0 + b·1) ]
+[ c d ]   [ 0 1 ]   [ (c·1 + d·0) (c·0 + d·1) ]
+≡
+// By Unit and Annihilator for the Kleene Algebra we have
+[ a b ]
+[ c d ]
+<netkat kleene exercise="Prove that the axiom <code>p·(q + r) ≡ p·q + p·r</code> is sound for the tropical Kleene Algebra">
+// We analyze two cases
+
+// Case 1: min(q,r) = q
+// Then we also have
+min(p·q, p·r) = p·q
+// By then definition of multiplication in the tropical Kleene Algebra
+
+// Hence
+p·(q + r)
+≡ // Definition of addition
+p·q
+≡ // By definition of addition and the property above
+p·q + p·r
+
+// Case 2: min(q,r) = r
+// Symmetric to the previous case
+</netkat>
+
+<netkat kleene exercise="Prove <code>1 ≤ x*</code>">
 1 + x*
 ≡ // Fixpoint
 1 + (1 + x·x*)
