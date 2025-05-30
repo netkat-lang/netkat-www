@@ -569,9 +569,82 @@ let spec =
     else if dst ~ 10.0.2.2 then sw := 0x2; pt := 0x2
     else if dst ~ 10.0.3.3 then sw := 0x3; pt := 0x3
     else 0
-  else
-    0 in 
+  else 0 in
 net ^ spec</netkat>
+
+    <netkat example="The following program has a loop...">
+let sw = &x[0..4] in
+let pt = &x[4..8] in
+let src = &x[8..40] in
+let dst = &x[40..72] in
+let topo =
+  if sw ~ 0x1 & pt ~ 0x2 then sw := 0x2; pt := 0x1
+  else if sw ~ 0x1 & pt ~ 0x3 then sw := 0x3; pt := 0x1
+  else if sw ~ 0x2 & pt ~ 0x1 then sw := 0x1; pt := 0x2
+  else if sw ~ 0x2 & pt ~ 0x3 then sw := 0x3; pt := 0x2
+  else if sw ~ 0x3 & pt ~ 0x1 then sw := 0x1; pt := 0x3
+  else if sw ~ 0x3 & pt ~ 0x2 then sw := 0x2; pt := 0x3
+  else 0 in
+let switch1 = 
+  if dst ~ 10.0.1.1 then pt := 0x1 
+  else if dst ~ 10.0.2.2 then pt := 0x2
+  else if dst ~ 10.0.3.3 then pt := 0x3
+  else 0 in
+let switch2 = 
+  if dst ~ 10.0.1.1 then pt := 0x1 
+  else if dst ~ 10.0.2.2 then pt := 0x2
+  else if dst ~ 10.0.3.3 then pt := 0x3
+  else 0 in
+let switch3 =
+  if dst ~ 10.0.1.1 then pt := 0x1 
+  else if dst ~ 10.0.2.2 then pt := 0x2
+  else if dst ~ 10.0.3.3 then pt := 0x2
+  else 0 in
+let switch = sw ~ 0x1; switch1 + sw ~ 0x2; switch2 + sw ~0x3; switch 3
+let edge =
+  sw ~ 0x1 & pt ~ 0x1 +
+  sw ~ 0x2 & pt ~ 0x2 +
+  sw ~ 0x3 & pt ~ 0x3 in
+let net =
+  edge; (switch; topo)*; switch; edge in
+  net</netkat>    
+
+    <netkat exercise="Can you write a specification to find the bug?">
+let sw = &x[0..4] in
+let pt = &x[4..8] in
+let src = &x[8..40] in
+let dst = &x[40..72] in
+let topo =
+  if sw ~ 0x1 & pt ~ 0x2 then sw := 0x2; pt := 0x1
+  else if sw ~ 0x1 & pt ~ 0x3 then sw := 0x3; pt := 0x1
+  else if sw ~ 0x2 & pt ~ 0x1 then sw := 0x1; pt := 0x2
+  else if sw ~ 0x2 & pt ~ 0x3 then sw := 0x3; pt := 0x2
+  else if sw ~ 0x3 & pt ~ 0x1 then sw := 0x1; pt := 0x3
+  else if sw ~ 0x3 & pt ~ 0x2 then sw := 0x2; pt := 0x3
+  else 0 in
+let switch1 = 
+  if dst ~ 10.0.1.1 then pt := 0x1 
+  else if dst ~ 10.0.2.2 then pt := 0x2
+  else if dst ~ 10.0.3.3 then pt := 0x3
+  else 0 in
+let switch2 = 
+  if dst ~ 10.0.1.1 then pt := 0x1 
+  else if dst ~ 10.0.2.2 then pt := 0x2
+  else if dst ~ 10.0.3.3 then pt := 0x3
+  else 0 in
+let switch3 =
+  if dst ~ 10.0.1.1 then pt := 0x1 
+  else if dst ~ 10.0.2.2 then pt := 0x2
+  else if dst ~ 10.0.3.3 then pt := 0x2
+  else 0 in
+let switch = sw ~ 0x1; switch1 + sw ~ 0x2; switch2 + sw ~0x3; switch 3
+let edge =
+  sw ~ 0x1 & pt ~ 0x1 +
+  sw ~ 0x2 & pt ~ 0x2 +
+  sw ~ 0x3 & pt ~ 0x3 in
+let net =
+  (switch; topo)*; switch in
+  net ^ 1</netkat>    
   </div>
   
 <div class="github-link">
