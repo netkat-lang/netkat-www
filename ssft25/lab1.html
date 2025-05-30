@@ -198,8 +198,7 @@
 	<li><p>Prove that the axiom <code>p·1 ≡ p</code> is sound for 2 x 2 matrices over a Kleene Algebra</li>
 	<li><p>Prove that the axiom <code>p·(q + r) ≡ p·q + p·r</code> is sound for the tropical Kleene Algebra</li>
 	<li><p>Prove the following using Kleene Algebra:</p>
-	  <ul>
-	    <li><netkat kleene exercise="1 ≤ x*">
+<netkat kleene exercise="1 ≤ x*">
 1 + x*
 ≡ // Fixpoint
 1 + (1 + x·x*)
@@ -209,25 +208,191 @@
 1 + x·x*
 ≡ // Fixpoint
 x*	    
-</netkat></li>
-	    <li><code>x ≤ x*</code></li>
-	    <li><code>x*·x* ≡ x*</code></li>
-	    <li><code>x** ≡ x*</code></li>
-	  </ul>
-	</li>
-	<li><p>Prove the following using Kleene Algebra:</p>
-	  <ul>
-	      <li><code>(a + b)* ≡ (a*·b)*·a*</code></li>
-	      <li><code>(p·q)*·p ≡ p·(q·p)*</code></li>
-	  </ul>
-	</li>
-	  <li><p>Prove the following using Kleene Algebra:</p>
-	    <ul>
-	      <li><code>b·p ≤ b·p·c</code> iff <code>b·p ≡ b·p·c</code></li>
-	      <li><code>b·p ≡ b·p·c</code> iff <code>b·p·!c ≡ 0</code></li>
-	    </ul>
-	  </li>
-      </ul>
+</netkat>
+<netkat kleene exercise="x ≤ x*">
+x + x*
+≡ // Fixpoint
+x + 1 + x·x*
+≡ // Fixpoint
+x + 1 + x·(1 + x·x*)
+≡ // Distributivity
+x + 1 + x·1 + x·x·x*
+≡ // Unit
+x + 1 + x + x·x·x*
+≡ // Commutativity
+1 + x + x + x·x·x*
+≡ // Associativity, Idempotence
+1 + x + x·x·x*
+≡ // Distributivity
+1 + x·(1 + x·x*)
+≡ // Fixpoint
+1 + x·x*
+≡ // Fixpoint
+x*
+</netkat>
+
+<netkat kleene exercise="x*·x* ≡ x*">
+// Prove inclusions in each direction
+
+// Lemma: x* ≤ x*·x*
+// By Exercise above
+1 ≤ x*
+=> // Monotonicity
+x*·1 ≤ x*·x*
+=> // Unit
+x* ≤ x*·x*
+
+// Lemma: x* ≤ x*·x*	
+x* + x·x* + x*
+≡ // Fixpoint
+1 + x·x* + x·x* + x*
+≡ // Idempotence
+1 + x·x* + x*
+≡ // Fixpoint
+x* + x*
+≡ // Idempotence
+x*
+</netkat>
+  
+<netkat kleene exercise="x** ≡ x*">
+// Prove inclusions in each direction
+
+//Lemma: x* ≤ x**
+x* + x**
+≡ // Fixpoint
+x* + 1 + x*·x**
+≡ // Fixpoint
+x* + 1 + x*·(1 + x*·x**)
+≡ // Distributivity
+x* + 1 + x* + x*·x*·x**
+≡ // Associativity, Idempotence
+1 + x* + x*·x*·x**
+≡ // Distributivity
+1 + x*·(1 + x*·x**)
+≡ // Fixpoint
+1 + x*·x**
+≡ // Fixpoint
+x**    
+
+// Auxiliary Lemma: 1 + x*·x* ≤ x*
+Proof.  
+1 + x*·x*
+≡ // By previous Lemma
+1 + x*
+≡ // Fixpoint
+1 + 1 + x·x*
+≡ // Associativity, Idempotence
+1 + x·x*
+≡ // Fixpoint
+x*
+
+// Lemma: x** ≤ x*
+//By Auxiliary Lemma and Least Fixpoint (q + p·y ≤ y → p*·q ≤ y) with
+- q = 1,
+- p = x*, and
+- y = x*,
+// we have:
+x**·1 ≤ x*
+// Then, by Idempotence, we have
+x** ≤ x*
+</netkat>
+<netkat kleene exercise="(a + b)* ≡ (a*·b)*·a*">
+//Lemma: (a*·b)*·a*  ≤ (a + b)*
+//See proof from Lecture 1 using mononoticity		       
+
+//Lemma: (a + b)* ≤ (a*·b)*·a*
+//Observe		     
+1  ≤ a*·(b·a*)*
+a·a*·(b·a*)* ≤ a*·(b·a*)*
+b·a*·(b·a*)* ≤ (b·a*)* ≤ a*·(b·a*)*
+//Hence
+1 + (a + b)·a*·(b·a*)*
+≤ 1 + a·a*·(b·a*)* + b·a*·(b·a*)*
+≤ a*·(b·a*)*
+// By Least Fixpoint (q + p·y ≤ y → p*·q ≤ y) with
+- q = 1
+- p = (a + b)
+- y = a*·(a*·b)*
+// we have
+(a + b)*·1 ≤ a*·(a*·b)*
+// By Idempotence we have
+(a + b)* ≤ a*·(a*·b)*
+// By the Sliding rule (proved next), we have
+(a + b)* ≤ (a*·b)*·a*
+</netkat>  
+
+<netkat kleene exercise="(p·q)*·p ≡ p·(q·p)*">
+//Prove inclusions in each direction
+//Lemma: p·(q·p)* ≤ (p·q)*·p
+//We first show: p + ((p· q)*· p)· (q·p) ≤ (p·q)*·p.
+p + ((p·q)*·p)·(q·p)
+≡ // Associativity
+p + ((p·q)*·(p·q))·p
+≡ // Distributivity
+(1 + (p·q)*·(p·q))·p
+= // Fixpoint
+(p·q)*·p
+
+// By Least Fixpoint (q + y·p ≤ y -> q·p* ≤ y) with
+- q = p
+- p = (q·p)
+- y = (p·q)*·p
+// we have
+p·(q·p)* ≤ (p·q)*·p
+
+//Lemma: (p·q)*·p ≤ p·(q·p)*
+// We first show: p + (p·q)·p·(q·p)*  ≤ p·(q·p)* 
+p + (p·q)·p·(q·p)*
+≡ // Associativity
+p + p·(q·p)·(q·p)*
+≡ // Distributivity
+p·(1 + (q·p)·(q·p)*
+≡ // Fixpoint
+p·(q·p)*  
+
+// By Least Fixpoint (q + p·y ≤ y -> p*·q ≤ y) with
+- q = p
+- p = (p·q)
+- y = (p·q)*·p
+// we have
+(p·q)*·p ≤ p·(q·p)*
+</netkat>
+
+<netkat kleene exercise="b·p ≤ b·p·c iff b·p ≡ b·p·c">
+//Prove each implication separately  
+//For the forward implication, by
+c ≤ 1
+// and monotocity, we have
+bpc ≤ bp.
+
+//The backward implication is trivial
+</netkat>  
+
+<netkat kleene exercise="b·p ≡ b·p·c</code> iff <code>b·p·!c ≡ 0">
+//Prove each implication separately
+
+//For the forward implication
+b·p·!c
+≡ // Assumption
+b·p·c·!c
+≡ // Contradcition
+b·p·0
+≡ // Annihilator
+
+//For the reverse implication
+b·p
+≡ // Unit
+b·p·1
+≡ // Excluded middle
+b·p·(c + !c)
+≡ // Distributivity
+b·p·c + b·p·!c
+≡ // Assumption
+bpc + 0
+≡ // Unit
+bpc
+</netkat>
+
       <h2>NetKAT Tutorial</h2>
       <p>The rest of this lab is an interactive tutorial that introduces the basic features of NetKAT.</p>
       
