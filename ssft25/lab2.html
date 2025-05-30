@@ -603,7 +603,7 @@ let switch3 =
   else if dst ~ 10.0.2.2 then pt := 0x2
   else if dst ~ 10.0.3.3 then pt := 0x2
   else 0 in
-let switch = sw ~ 0x1; switch1 + sw ~ 0x2; switch2 + sw ~0x3; switch 3 in
+let switch = sw ~ 0x1; switch1 + sw ~ 0x2; switch2 + sw ~0x3; switch3 in
 let edge =
   sw ~ 0x1 & pt ~ 0x1 +
   sw ~ 0x2 & pt ~ 0x2 +
