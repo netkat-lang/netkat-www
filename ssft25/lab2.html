@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KATch2 NetKAT Analyzer</title>
+    <title>Programming and Reasoning with KAT - Lab 2</title>
     <link rel="icon" type="image/png" href="../assets/favicon.png">
     <style>
         body {
@@ -439,14 +439,14 @@ let port = &x[64..80] in
           </li><code>port</code> a 4-bit value that encodes the switch where the packet is currently located, typically written in hexidecimal notation,</li>
           <li><code>src</code> a 32-bit value that encodes the source address, typically written as an IP address, and
           <li><code>src</code> a 32-bit value that encodes the destination address, typically written as an IP address.
-	<ul>
-	<netkat example="Standard fictitious packet fields">
-        let switch = &x[0..4] in
-	let port = &x[4..8] in
-	let src = &x[8..40] in
-        let dst = &x[40..72] in
-	switch = 0x01 & port = 0xFF
-	</netkat>
+	</ul>
+<netkat example="Standard fictitious packet fields">
+let switch = &x[0..4] in
+let port = &x[4..8] in
+let src = &x[8..40] in
+let dst = &x[40..72] in
+switch = 0x1 & port = 0x9
+</netkat>
   </div>
     
     <div class="github-link">
