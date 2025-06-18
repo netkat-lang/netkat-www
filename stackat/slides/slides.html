@@ -86,6 +86,10 @@
                 </p>
                 <a href="https://netkat.org/stackat" style="font-size: 2rem; margin-top: 60px; display: block">netkat.org/stackat</a> 
                 </div>
+
+                <aside class="notes">
+                    Will give a quick introduction to networking.
+                </aside>
             </section>
 
             <!-- Slide 2: Packet processing animation showing how packets traverse networks and get modified -->
@@ -134,7 +138,16 @@
                     </div>
                 </div>
                 
-  
+                <aside class="notes">
+                    <ul>
+                        <li>Here is a network of switches.</li>
+                        <li>A packet travels through the network.</li>
+                        <li>Packet is a list of header fields.</li>
+                        <li>Fields are updated on each switch.</li>
+                        <li>Current packet location is a virtual field.</li>
+                        <li>Switch action = read packet fields, write new fields, send to neighbor.</li>
+                    </ul>
+                </aside>
             </section>
 <!-- 
             <div class="fragment">
@@ -154,7 +167,7 @@
 
             <!-- Slide 3: NetKAT Network Verification -->
             <section data-transition="fade">
-                <h2>NetKAT: Network Verification</h2>
+                <h2 style="font-size: 1.2em">NetKAT Network Modeling and Verification</h2>
                 
                 <div style="display: flex; gap: 40px; margin-top: 20px; align-items: flex-start;">
                     <!-- Left column: Pipeline -->
@@ -275,12 +288,21 @@
                         </div>
                         
                         <div style="margin-top: 25px; padding: 12px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 6px;">
-                            <p style="font-size: 0.65em; margin: 0; color: #856404;">
-                                <strong>NetKAT:</strong> Kleene algebra with tests for network verification
+                            <p style="font-size: 0.6em; margin: 0; color: #856404; text-align: center;">
+                                Kleene algebra with decidable equivalence for automated verification
                             </p>
                         </div>
                     </div>
                 </div>
+
+                <aside class="notes">
+                    <ul>
+                        <li>NetKAT is a formal modeling language for networks.
+                        <li>Model processing as a program with local variables.
+                        <li>Network verification = program verification.
+                        <li>In particular, automated verification by decidable program equivalence.
+                    </ul>
+                </aside>
             </section>
 
             <!-- Slide 4: NetKAT Limitation -->
