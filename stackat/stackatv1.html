@@ -1,0 +1,3424 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StacKAT</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.23.0/cytoscape.min.js"></script>
+    <!-- Added modern font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <script>
+        function replacer(key, value) {
+            if (value instanceof Map) {
+                return {
+                    dataType: 'Map',
+                    value: Array.from(value.entries())
+                };
+            } else {
+                return value;
+            }
+        }
+
+        function hash(obj) {
+            return JSON.stringify(obj, replacer);
+        }
+
+
+        let nodeCache = new Map();
+        function mk(type, ...args) {
+            let node = [type, ...args];
+            let key = hash(node);
+            if (!nodeCache.has(key)) {
+                nodeCache.set(key, node);
+            }
+            return nodeCache.get(key);
+        }
+
+        const zero = mk('zero');
+        const one = mk('one');
+        const push = (n) => mk('push', n);
+        const pop = (n) => mk('pop', n);
+        const test = (id, n) => mk('test', id, n);
+        const testNE = (id, n) => mk('testNE', id, n);
+        const mut = (id, n) => mk('mut', id, n);
+        const alt = (a, b) => mk('alt', a, b);
+        const seq = (a, b) => mk('seq', a, b);
+        const star = (a) => mk('star', a);
+
+        const pair = (a, b) => mk('pair', a, b);
+
+
+        class ParseError extends Error {
+            constructor(message, index, input) {
+                super(message);
+                this.index = index;
+                this.input = input;
+            }
+        }
+
+        function parse(input) {
+            let current = 0;
+            function error(message) {
+                throw new ParseError(message, current, input);
+            }
+            function ws() {
+                while (current < input.length && (input[current] == ' ' || input[current] == '\n')) {
+                    current++;
+                }
+            }
+            function tok(str) {
+                let oldCurrent = current;
+                ws();
+                let i = 0;
+                while (true) {
+                    if (i < str.length) {
+                        if (current < input.length && str[i] == input[current]) {
+                            i++; current++;
+                        } else {
+                            current = oldCurrent;
+                            return false;
+                        }
+                    } else {
+                        return str;
+                    }
+                }
+            }
+            function expect(str) {
+                let token = tok(str);
+                if (token) {
+                    return token;
+                } else {
+                    error('Expecting <code>' + str + '</code>');
+                }
+            }
+            function num() {
+                let oldCurrent = current;
+                ws();
+                let str = '';
+                while (current < input.length && /[0-9]/.test(input[current])) {
+                    str += input[current];
+                    current++;
+                }
+                if (str == '') {
+                    current = oldCurrent;
+                    return false;
+                } else {
+                    return parseInt(str);
+                }
+            }
+            function expectNum() {
+                let n = num();
+                if (n !== false) {
+                    return n;
+                } else {
+                    error('Expecting a number')
+                }
+            }
+            function ident() {
+                let oldCurrent = current;
+                ws();
+                if (current < input.length && /[a-zA-Z]/.test(input[current])) {
+                    let str = input[current];
+                    current++;
+                    while (current < input.length && /[0-9a-zA-Z]/.test(input[current])) {
+                        str += input[current];
+                        current++;
+                    }
+                    return str;
+                } else {
+                    current = oldCurrent;
+                    return false;
+                }
+            }
+            function atom() {
+                if (tok('(')) {
+                    let e = expression(0);
+                    if (!e) {
+                        error('Expecting an expression')
+                    }
+                    if (!tok(')')) {
+                        error('Expecting <code>)</code> or another expression')
+                    }
+                    return e;
+                } else if (tok('0')) {
+                    return zero;
+                } else if (tok('1')) {
+                    return one
+                } else if (tok('push')) {
+                    expect('(')
+                    let n = expectNum();
+                    expect(')');
+                    return push(n)
+                } else if (tok('pop')) {
+                    expect('(')
+                    let n = expectNum();
+                    expect(')');
+                    return pop(n)
+                } else {
+                    let oldCurrent = current;
+                    let id = ident();
+                    if (!id) { return false; }
+                    if (tok('==')) {
+                        let n = expectNum();
+                        return test(id, n);
+                    } else if (tok('!=')) {
+                        let n = expectNum();
+                        return testNE(id, n);
+                    } else if (tok(':=')) {
+                        let n = expectNum();
+                        return mut(id, n);
+                    } else {
+                        current = oldCurrent;
+                        return false;
+                    }
+                }
+            }
+            function expression(bp) {
+                let left = atom();
+                if (!left) { return false; }
+                while (true) {
+                    if (bp <= 0 && tok('+')) {
+                        ws();
+                        let right = expression(0);
+                        if (right) {
+                            left = alt(left, right);
+                        } else {
+                            error('Expecting an expression')
+                        }
+                    } else if (bp <= 20 && tok('*')) {
+                        left = star(left)
+                    } else if (bp <= 10) {
+                        let right = expression(10);
+                        if (right) {
+                            left = seq(left, right);
+                        } else {
+                            return left;
+                        }
+                    } else {
+                        return left;
+                    }
+                }
+            }
+            let e = expression(0);
+            ws();
+            if (current < input.length) {
+                error('Expecting an expression or end of input')
+            }
+            return e;
+        }
+
+        const parens = (bool, str) => bool ? `(${str})` : str;
+        function pretty(expr, bp = 0) {
+            switch (expr[0]) {
+                case 'zero': return '0';
+                case 'one': return '1';
+                case 'push': return `push(${expr[1]})`;
+                case 'pop': return `pop(${expr[1]})`;
+                case 'test': return parens(bp >= 20, `${expr[1]}==${expr[2]}`);
+                case 'testNE': return parens(bp >= 20, `${expr[1]}!=${expr[2]}`);
+                case 'mut': return parens(bp >= 20, `${expr[1]}:=${expr[2]}`);
+                case 'alt': return parens(bp > 0, `${pretty(expr[1], 0)} + ${pretty(expr[2], 0)}`);
+                case 'seq': return parens(bp > 10, `${pretty(expr[1], 10)} ${pretty(expr[2], 10)}`);
+                case 'star': return parens(bp > 20, `${pretty(expr[1], 20)}*`);
+                case 'pair':
+                    let left = expr[1] == one ? 'ε' : expr[1][1];
+                    let right = expr[2] == one ? 'ε' : expr[2][1];
+                    return `${left}/${right}`;
+                // if(expr[1] == one) return `□${pretty(expr[2])}`;
+                // if(expr[2] == one) return `${pretty(expr[1])}□`;
+                // return `${pretty(expr[1])}□${pretty(expr[2])}`;
+            }
+        }
+
+        function E(expr, pk) {
+            switch (expr[0]) {
+                case 'zero': return [];
+                case 'one': return [pk];
+                case 'push': return [];
+                case 'pop': return [];
+                case 'test': return pk.get(expr[1]) == expr[2] ? [pk] : [];
+                case 'testNE': return pk.get(expr[1]) != expr[2] ? [pk] : [];
+                case 'mut':
+                    let newPk = new Map(pk);
+                    newPk.set(expr[1], expr[2]);
+                    return [newPk];
+                case 'alt': return E(expr[1], pk).concat(E(expr[2], pk));
+                case 'seq':
+                    return E(expr[1], pk).flatMap(pk1 => E(expr[2], pk1));
+                case 'star':
+                    let res = new Map();
+                    res.set(hash(pk), pk);
+                    let todo = [pk];
+                    while (todo.length > 0) {
+                        let pk1 = todo.pop();
+                        for (let pk2 of E(expr[1], pk1)) {
+                            let key = hash(pk2)
+                            if (!res.has(key)) {
+                                res.set(key, pk2);
+                                todo.push(pk2);
+                            }
+                        }
+                    }
+                    return Array.from(res.values());
+            }
+        }
+
+        function D(expr, pk) {
+            switch (expr[0]) {
+                case 'zero': return [];
+                case 'one': return [];
+                case 'push':
+                    return [[expr, [one, pk]]];
+                case 'pop':
+                    return [[expr, [one, pk]]];
+                case 'test': return [];
+                case 'testNE': return [];
+                case 'mut': return [];
+                case 'alt': return D(expr[1], pk).concat(D(expr[2], pk));
+                case 'seq':
+                    let d1 = D(expr[1], pk).map(([trans, [expr1, pk1]]) => [trans, [seq(expr1, expr[2]), pk1]]);
+                    let e1 = E(expr[1], pk);
+                    let d2 = e1.flatMap(pk1 => D(expr[2], pk1));
+                    return d1.concat(d2);
+                case 'star':
+                    let e = E(expr, pk);
+                    return e.flatMap(pk1 => D(expr[1], pk1).map(([trans, [expr2, pk2]]) => [trans, [seq(expr2, expr), pk2]]));
+            }
+        }
+
+        function dom(expr) {
+            let res = new Map();
+            function iter(e) {
+                switch (e[0]) {
+                    case 'zero': return;
+                    case 'one': return;
+                    case 'push': return;
+                    case 'pop': return;
+                    case 'test':
+                        if (!res.has(e[1])) res.set(e[1], new Set());
+                        res.get(e[1]).add(e[2]);
+                    case 'testNE':
+                        if (!res.has(e[1])) res.set(e[1], new Set());
+                        res.get(e[1]).add(e[2]);
+                    case 'mut':
+                        if (!res.has(e[1])) res.set(e[1], new Set());
+                        res.get(e[1]).add(e[2]);
+                    case 'alt': iter(e[1]); iter(e[2]); return;
+                    case 'seq': iter(e[1]); iter(e[2]); return;
+                    case 'star': iter(e[1]); return;
+                }
+            }
+            iter(expr);
+            return res;
+        }
+
+        function getValues(expr) {
+            // returns all the values used in push/pop in expr and v
+            let res = new Set();
+            function iter(e) {
+                switch (e[0]) {
+                    case 'zero': return;
+                    case 'one': return;
+                    case 'push': res.add(e[1]); return;
+                    case 'pop': res.add(e[1]); return;
+                    case 'test': return;
+                    case 'mut': return;
+                    case 'alt': iter(e[1]); iter(e[2]); return;
+                    case 'seq': iter(e[1]); iter(e[2]); return;
+                    case 'star': iter(e[1]); return;
+                }
+            }
+            iter(expr);
+            res.add("?");
+            // convert to array
+            return Array.from(res);
+        }
+
+        function automaton(expr, inpk, outpk) {
+            // Computes an automaton from an expression, going from inpk to outpk
+            let aut = new Map();
+            let final = new Set();
+            let todo = [[expr, inpk]];
+            while (todo.length > 0) {
+                let [ee, pk] = todo.pop();
+                let key = hash([ee, pk]);
+                if (aut.has(key)) continue
+                let ds = D(ee, pk);
+                aut.set(key, ds.map(([trans, state]) => [trans, hash(state)]));
+                for (let [trans, state] of ds) {
+                    todo.push(state);
+                }
+                let es = E(ee, pk);
+                for (let pk1 of es) {
+                    // check if outpk is equal to pk2, but compare them as maps
+                    if (hash(pk1) == hash(outpk)) {
+                        final.add(key);
+                    }
+                }
+            }
+            return { start: hash([expr, inpk]), aut, final };
+        }
+
+        function pushpop(automaton) {
+            // computes the push-pop closure of an automaton
+            // first, copy the automaton, adding epsilon transitions
+            let { start: start0, aut: aut0, final: final0 } = automaton;
+            let aut = new Map();
+            for (const [key, ds] of aut0.entries()) {
+                aut.set(key, [[one, key], ...ds]);
+            }
+            let changed = true;
+            function addEpsilon(key1, key2) {
+                let ds = aut.get(key1);
+                for (let [trans, key3] of ds) {
+                    if (trans == one && key3 == key2) return;
+                }
+                ds.push([one, key2]);
+                changed = true;
+            }
+            let fuel = 100;
+            while (changed) {
+                fuel -= 1;
+                if (fuel <= 0) {
+                    console.log('Fuel exhausted in pushpop');
+                    break;
+                    // throw new Error('Fuel exhausted in pushpop');
+                }
+                changed = false;
+                for (let [key1, ds1] of aut.entries()) {
+                    // shortcut push-eps-pop
+                    for (let [trans1, key2] of ds1) {
+                        if (trans1[0] == 'push') {
+                            for (let [trans2, key3] of aut.get(key2)) {
+                                if (trans2 == one) {
+                                    for (let [trans3, key4] of aut.get(key3)) {
+                                        if (trans3[0] == 'pop' && trans3[1] == trans1[1]) {
+                                            addEpsilon(key1, key4);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    // shortcut eps-eps
+                    for (let [trans1, key2] of ds1) {
+                        if (trans1 == one) {
+                            for (let [trans2, key3] of aut.get(key2)) {
+                                if (trans2 == one) {
+                                    addEpsilon(key1, key3);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            return { start: start0, aut: aut, final: final0 };
+        }
+
+        function zip(automaton) {
+            let { start: start0, aut: aut0, final: final0 } = automaton;
+            // build reverse transitions into aut0rev
+            let aut0rev = new Map();
+            for (let [key, ds] of aut0.entries()) {
+                if (!aut0rev.has(key)) aut0rev.set(key, []);
+                for (let [trans, key1] of ds) {
+                    if (!aut0rev.has(key1)) aut0rev.set(key1, []);
+                    aut0rev.get(key1).push([trans, key]);
+                }
+            }
+            let aut = new Map();
+            aut.set('start', []);
+            let todo = []
+            function addState([key1, key2]) {
+                let key = hash([key1, key2]);
+                if (aut.has(key)) return;
+                aut.set(key, []);
+                todo.push([key1, key2]);
+            }
+            function addTransition([key1, key2], [key3, key4], trans) {
+                addState([key3, key4]);
+                aut.get(hash([key1, key2])).push([trans, hash([key3, key4])]);
+            }
+            for (let key of aut0.keys()) {
+                addState([key, key])
+                aut.get('start').push([one, hash([key, key])]);
+            }
+            while (todo.length > 0) {
+                let [key1, key2] = todo.pop();
+                // if key1 is the start state, add a transition to ['done', key2]
+                if (key1 == start0) {
+                    addTransition([key1, key2], ['done', key2], one);
+                }
+                // if key2 is a final state, add a transition to [key1, 'done']
+                if (final0.has(key2)) {
+                    addTransition([key1, key2], [key1, 'done'], one);
+                }
+                if (key1 == 'done' && key2 != 'done') {
+                    let ds2 = aut0.get(key2);
+                    for (let [trans2, key3] of ds2) {
+                        if (trans2[0] == 'push') {
+                            addTransition(['done', key2], ['done', key3], pair(one, trans2));
+                        } else if (trans2 == one) {
+                            addTransition(['done', key2], ['done', key3], one);
+                        }
+                    }
+                }
+                if (key1 != 'done' && key2 == 'done') {
+                    let ds1 = aut0rev.get(key1);
+                    for (let [trans1, key3] of ds1) {
+                        if (trans1[0] == 'pop') {
+                            addTransition([key1, 'done'], [key3, 'done'], pair(trans1, one));
+                        } else if (trans1 == one) {
+                            addTransition([key1, 'done'], [key3, 'done'], one);
+                        }
+                    }
+                }
+                if (key1 != 'done' && key2 != 'done') {
+                    let ds1 = aut0rev.get(key1);
+                    for (let [trans1, key3] of ds1) {
+                        if (trans1 == one) {
+                            addTransition([key1, key2], [key3, key2], one);
+                        }
+                    }
+                    let ds2 = aut0.get(key2);
+                    for (let [trans2, key] of ds2) {
+                        if (trans2 == one) {
+                            addTransition([key1, key2], [key1, key], one);
+                        }
+                    }
+                    for (let [trans1, key3] of ds1) {
+                        for (let [trans2, key4] of ds2) {
+                            // if trans1 is pop and trans2 is push, add a transition
+                            if (trans1[0] == 'pop' && trans2[0] == 'push') {
+                                addTransition([key1, key2], [key3, key4], pair(trans1, trans2));
+                            }
+                        }
+                    }
+                }
+            }
+            return { start: 'start', aut, final: new Set([hash(['done', 'done'])]) };
+        }
+
+        function addStartLoopsMut(automaton, values) {
+            let { start, aut, final } = automaton;
+            // add (pop(i), push(i)) transitions for all i in values from start to start
+            for (let i of values) {
+                aut.get(start).push([pair(pop(i), push(i)), start]);
+            }
+        }
+
+        function removeEps(automaton) {
+            let { start: start0, aut: aut0, final: final0 } = automaton;
+            let aut = new Map();
+            let final = new Set();
+            let todo = [[start0, start0]]
+            let seen = new Set();
+            while (todo.length > 0) {
+                let [orig, key] = todo.pop();
+                if (!aut.has(orig)) aut.set(orig, []);
+                let hashKey = hash([orig, key]);
+                if (seen.has(hashKey)) continue;
+                seen.add(hashKey);
+                let ds = aut0.get(key);
+                for (let [trans, key1] of ds) {
+                    if (trans == one) {
+                        todo.push([orig, key1]);
+                    } else {
+                        // add transition if not already present
+                        if (aut.get(orig).every(([trans2, key2]) => hash(trans2) != hash(trans) || key2 != key1)) {
+                            aut.get(orig).push([trans, key1]);
+                        }
+                        todo.push([key1, key1]);
+                    }
+                }
+                if (final0.has(key)) {
+                    final.add(orig);
+                }
+            }
+            return { start: start0, aut, final };
+        }
+
+        function removeDead(automaton) {
+            let { start: start0, aut: aut0, final: final0 } = automaton;
+            // build reverse transitions into aut0rev
+            let aut0rev = new Map();
+            for (let [key, ds] of aut0.entries()) {
+                if (!aut0rev.has(key)) aut0rev.set(key, []);
+                for (let [trans, key1] of ds) {
+                    if (!aut0rev.has(key1)) aut0rev.set(key1, []);
+                    aut0rev.get(key1).push([trans, key]);
+                }
+            }
+            // flood fill from final states
+            let todo = Array.from(final0);
+            let seen = new Set([]);
+            while (todo.length > 0) {
+                let key = todo.pop();
+                if (seen.has(key)) continue;
+                seen.add(key);
+                for (let [trans, key1] of aut0rev.get(key)) {
+                    todo.push(key1);
+                }
+            }
+            // remove unreachable states
+            let aut = new Map();
+            for (let [key, ds] of aut0.entries()) {
+                if (seen.has(key)) {
+                    aut.set(key, ds.filter(([trans, key1]) => seen.has(key1)));
+                }
+            }
+            if (!seen.has(start0)) {
+                aut.set(start0, []);
+            }
+            return { start: start0, aut, final: final0 };
+        }
+
+        function sortUniq(arr) {
+            return Array.from(new Set(arr)).sort();
+        }
+
+        function determinize(automaton) {
+            let { start: start0, aut: aut0, final: final0 } = automaton;
+            let aut = new Map();
+            let final = new Set();
+            let todo = [[start0]];
+            let seen = new Set();
+            while (todo.length > 0) {
+                let keys = todo.pop();
+                // make keys final if any of the keys is final
+                if (keys.some(key => final0.has(key))) {
+                    final.add(keys.join(','));
+                }
+                let key = keys.join(',');
+                if (seen.has(key)) continue;
+                seen.add(key);
+                let ds = new Map();
+                for (let key1 of keys) {
+                    for (let [trans, key2] of aut0.get(key1)) {
+                        // if already present, continue
+                        if (ds.has(hash(trans))) continue;
+                        // add the transition on trans
+                        // we have to do trans on all the states in keys
+                        let newKeys = [];
+                        for (let key3 of keys) {
+                            for (let [trans1, key4] of aut0.get(key3)) {
+                                if (hash(trans1) == hash(trans)) {
+                                    newKeys.push(key4);
+                                }
+                            }
+                        }
+                        newKeys = sortUniq(newKeys);
+                        ds.set(hash(trans), [trans, newKeys.join(",")]);
+                        todo.push(newKeys);
+                    }
+                }
+                aut.set(key, Array.from(ds.values()));
+            }
+            return { start: start0, aut, final };
+        }
+
+        function mergeRedundantEdges(automaton) {
+            // merges edges such as 5,5 into v,v
+            let { start, aut: aut0, final } = automaton;
+            let aut = new Map();
+            for (let [key, ds] of aut0.entries()) {
+                let vvTargets = new Set();
+                for (let [trans, key1] of ds) {
+                    if (trans == pair(pop("?"), push("?"))) {
+                        vvTargets.add(key1);
+                    }
+                }
+                let newDs = [];
+                for (let [trans, key1] of ds) {
+                    if (trans[1][1] != trans[2][1] || !vvTargets.has(key1) || trans[1][1] == "?") {
+                        newDs.push([trans, key1]);
+                    }
+                }
+                aut.set(key, newDs);
+            }
+            return { start, aut, final };
+        }
+
+        function minimize(automaton) {
+            let { start: start0, aut: aut0, final: final0 } = automaton;
+            let eclass = new Map();
+            for (let key of aut0.keys()) {
+                eclass.set(key, 0);
+            }
+            function sig(key) {
+                let sig = aut0.get(key).map(([trans, key1]) => hash([trans, eclass.get(key1)]));
+                sig.sort();
+                let sigstr = sig.join(',');
+                let finalstr = final0.has(key) ? '|1' : '|0';
+                sigstr += finalstr;
+                return sigstr;
+            }
+            let fuel = 100;
+            while (true) {
+                fuel -= 1;
+                let i = 0;
+                let sigmap = new Map();
+                for (let key of aut0.keys()) {
+                    // build the signature of key
+                    let sigstr = sig(key);
+                    if (!sigmap.has(sigstr)) {
+                        sigmap.set(sigstr, i);
+                        i += 1;
+                    }
+                }
+                let neweclass = new Map();
+                for (let key of aut0.keys()) {
+                    let sigstr = sig(key);
+                    neweclass.set(key, sigmap.get(sigstr));
+                }
+                if (hash(eclass) == hash(neweclass)) {
+                    break;
+                } else {
+                    eclass = neweclass;
+                }
+                if (fuel < 0) {
+                    console.log('Fuel exhausted in minimize');
+                    return;
+                }
+            }
+            function name(key) {
+                return `s${eclass.get(key).toString()}`;
+            }
+            let aut = new Map();
+            for (let [key, ds] of aut0.entries()) {
+                aut.set(name(key), aut0.get(key).map(([trans, key2]) => [trans, name(key2)]))
+            }
+            let final = new Set(Array.from(final0).map(key => name(key)));
+            let start = name(start0);
+            return { start, aut, final };
+        }
+
+        function shortestDifferingPath(automaton1, automaton2) {
+            // returns the shortest string that is accepted by automaton1 but not by automaton2
+            // if no such string exists, returns false
+            // automaton1 and automaton2 must be deterministic automata
+            let { start: start1, aut: aut1, final: final1 } = automaton1;
+            let { start: start2, aut: aut2, final: final2 } = automaton2;
+            let todo = [[start1, start2, []]];
+            let seen = new Set();
+            while (todo.length > 0) {
+                let [key1, key2, path] = todo.shift();
+                console.log("comparison", key1, key2, path)
+                let key = hash([key1, key2]);
+                if (seen.has(key)) continue;
+                seen.add(key);
+                if (final1.has(key1) && !final2.has(key2)) {
+                    return path;
+                }
+                for (let [trans1, key3] of aut1.get(key1)) {
+                    if (!aut2.has(key2)) {
+                        todo.push([key3, "dead", path.concat([trans1])]);
+                        continue;
+                    }
+                    let found = false;
+                    for (let [trans2, key4] of aut2.get(key2)) {
+                        if (hash(trans1) == hash(trans2)) {
+                            todo.push([key3, key4, path.concat([trans1])]);
+                            found = true;
+                        }
+                    }
+                    if (!found) {
+                        todo.push([key3, "dead", path.concat([trans1])]);
+                    }
+                }
+            }
+            return false;
+        }
+
+        function automatonToCytoscape(aut) {
+            let nodes = [];
+            let edges = [];
+            for (let [key, ds] of aut.aut.entries()) {
+                let classes = [];
+                let tooltip = '';
+
+                // Create a more readable state ID for display
+                let displayId = key;
+                try {
+                    // Try to parse if it's a JSON string (for automaton states)
+                    const parsedId = JSON.parse(key);
+                    if (typeof parsedId === 'object') {
+                        displayId = 'State ' + (nodes.length + 1);
+                    }
+                } catch (e) {
+                    // Not JSON, use as is
+                }
+
+                if (aut.final.has(key) && key == aut.start) {
+                    classes.push('accept', 'start');
+                    tooltip = '<strong>Initial and accepting state</strong>';
+                } else if (aut.final.has(key)) {
+                    classes.push('accept');
+                    tooltip = '<strong>Accepting state</strong>';
+                } else if (key == aut.start) {
+                    classes.push('start');
+                    tooltip = '<strong>Initial state</strong>';
+                } else {
+                    tooltip = '<strong>Intermediate state</strong>';
+                }
+
+                nodes.push({
+                    data: {
+                        id: key,
+                        label: '',
+                        tooltip: tooltip
+                    },
+                    classes: classes.join(' ')
+                });
+            }
+            let i = 0;
+            for (let [key, ds] of aut.aut.entries()) {
+                for (let [trans, state] of ds) {
+                    i += 1;
+                    edges.push({ data: { id: i, source: key, target: state, label: pretty(trans) } });
+                }
+            }
+            return { nodes, edges };
+        }
+
+        function minaut(result, values, inpk, outpk) {
+            let aut = automaton(result, inpk, outpk)
+            aut = pushpop(aut);
+            aut = zip(aut);
+            addStartLoopsMut(aut, values);
+            aut = removeEps(aut);
+            aut = removeDead(aut);
+            aut = determinize(aut);
+            aut = minimize(aut);
+            return aut;
+        }
+
+        function decidePk(expr1, expr2, inpk, outpk) {
+            let values = Array.from(new Set(getValues(expr1).concat(getValues(expr2))));
+            let aut1 = minaut(expr1, values, inpk, outpk);
+            let aut2 = minaut(expr2, values, inpk, outpk);
+            let path1 = shortestDifferingPath(aut1, aut2);
+            let path2 = shortestDifferingPath(aut2, aut1);
+            return [path1, path2];
+        }
+
+        function allpks(values) {
+            // values is a map from strings to sets of values
+            // we want to compute a list of maps with all possible values (like cartesian product)
+            let keys = Array.from(values.keys());
+            let pks = [new Map()];
+            for (let key of keys) {
+                let newpks = [];
+                for (let pk of pks) {
+                    for (let value of [...values.get(key), "?"]) {
+                        let newpk = new Map(pk);
+                        newpk.set(key, value);
+                        newpks.push(newpk);
+                    }
+                }
+                pks = newpks;
+            }
+            return pks;
+        }
+
+        function decide(expr1, expr2) {
+            // first, compute the domain of all values in expr1 and expr2
+            let dom1 = dom(expr1); // map from strings to sets of values
+            let dom2 = dom(expr2);
+            // union values2 into values1
+            for (let [key, values] of dom2.entries()) {
+                if (!dom1.has(key)) {
+                    dom1.set(key, values);
+                } else {
+                    for (let value of values) {
+                        dom1.get(key).add(value);
+                    }
+                }
+            }
+            // now, compute all possible pk's
+            let pks = allpks(dom1);
+            console.log("pks", pks)
+            // now, decide for each pk
+            let respath1 = false;
+            let respks1 = false;
+            let respath2 = false;
+            let respks2 = false;
+            for (let inpk of pks) {
+                for (let outpk of pks) {
+                    let [path1, path2] = decidePk(expr1, expr2, inpk, outpk);
+                    console.log("expr1", expr1)
+                    console.log("expr2", expr2)
+                    console.log("inpk", inpk)
+                    console.log("outpk", outpk)
+                    console.log("path1X", path1)
+                    console.log("path2X", path2)
+                    if (path1) {
+                        // update if path is shorter
+                        if (!respath1 || path1.length < respath1.length) {
+                            respath1 = path1;
+                            respks1 = [inpk, outpk];
+                        }
+                    }
+                    if (path2) {
+                        // update if path is shorter
+                        if (!respath2 || path2.length < respath2.length) {
+                            respath2 = path2;
+                            respks2 = [inpk, outpk];
+                        }
+                    }
+                }
+            }
+            return [respath1, respks1, respath2, respks2];
+        }
+
+        function renameStates(aut) {
+            let aut1 = new Map();
+            let key2num = new Map();
+            let num2key = new Map();
+            let i = 0;
+            for (let key of aut.aut.keys()) {
+                key2num.set(key, i);
+                num2key.set(i, key);
+                i += 1;
+            }
+            for (let [key, ds] of aut.aut.entries()) {
+                // console.log("ds", ds)
+                let i = key2num.get(key);
+                aut1.set(i, ds.map(([trans, key1]) => [trans, key2num.get(key1)]));
+            }
+            return { start: key2num.get(aut.start), aut: aut1, final: new Set(Array.from(aut.final).map(key => key2num.get(key))) };
+        }
+
+        function toGraphviz(aut0) {
+            let aut = renameStates(aut0);
+            let res = 'digraph {\n';
+            res += '  rankdir=LR;\n';
+            // final states
+            res += '  node [shape=doublecircle];';
+            for (let key of aut.final) {
+                res += ' ' + key
+            }
+            res += ';\n';
+            // add initial state incoming edge
+            res += '  node [shape=point]; start;\n';
+            // other states
+            res += '  node [shape=circle];\n';
+            res += '  start -> ' + aut.start + ';\n';
+            // transitions
+            for (let [key, ds] of aut.aut.entries()) {
+                for (let [trans, key1] of ds) {
+                    res += '  ' + key + ' -> ' + key1 + ' [label="' + pretty(trans) + '"];\n';
+                }
+            }
+            res += '}\n';
+            return res;
+        }
+
+        function decideLGE(expr1, expr2) {
+            let [path1, respks1, path2, respks2] = decide(expr1, expr2);
+            if (!path1 && !path2) {
+                return "=";
+            }
+            if (path1 && !path2) {
+                return ">";
+            }
+            if (!path1 && path2) {
+                return "<";
+            }
+            if (path1 && path2) {
+                return "!=";
+            }
+        }
+
+        // unit tests
+        function tests(){
+            // Test decide_equivalence_all
+            function test_decide_equivalence_all() {
+                // Same tests as above, but for decide_equivalence_all
+                let e1 = seq(star(pop("2")), star(push("2")));
+                let e2 = star(alt(push("2"), pop("2")));
+                let e3 = seq(star(push("2")), star(seq(pop("2"), pop("2"))));
+                let e4 = seq(star(seq(pop("2"), pop("2"))), star(push("2")));
+                let e5 = seq(star(seq(push("2"), push("2"))), star(pop("2")));
+                let e6 = seq(star(pop("2")), star(seq(push("2"), push("2"))));
+
+                console.assert(decideLGE(e1, e2) === "=");
+                console.assert(decideLGE(e1, e3) === "=");
+                console.assert(decideLGE(e1, e4) === ">");
+                console.assert(decideLGE(e1, e5) === "=");
+                console.assert(decideLGE(e1, e6) === ">");
+
+                console.assert(decideLGE(e2, e3) === "=");
+                console.assert(decideLGE(e3, e2) === "=");
+
+                console.assert(decideLGE(e2, e4) === ">");
+                console.assert(decideLGE(e4, e2) === "<");
+
+                console.assert(decideLGE(e2, e5) === "=");
+                console.assert(decideLGE(e5, e2) === "=");
+
+                console.assert(decideLGE(e2, e6) === ">");
+                console.assert(decideLGE(e6, e2) === "<");
+
+                console.assert(decideLGE(e3, e4) === ">");
+                console.assert(decideLGE(e4, e3) === "<");
+
+                console.assert(decideLGE(e3, e5) === "=");
+                console.assert(decideLGE(e5, e3) === "=");
+
+                console.assert(decideLGE(e3, e6) === ">");
+                console.assert(decideLGE(e6, e3) === "<");
+
+                console.assert(decideLGE(e4, e5) === "<");
+                console.assert(decideLGE(e5, e4) === ">");
+
+                console.assert(decideLGE(e4, e6) === "!=");
+                console.assert(decideLGE(e6, e4) === "!=");
+
+                console.assert(decideLGE(e5, e6) === ">");
+                console.assert(decideLGE(e6, e5) === "<");
+            }
+
+            // Test decide_equivalence_all_pure_headers
+            function test_decide_equivalence_all_pure_headers() {
+                let e1 = seq(mut("f", "2"), mut("g", "3"));
+                let e2 = seq(mut("g", "3"), mut("f", "2"));
+                console.assert(decideLGE(e1, e2) === "=");
+
+                let e3 = seq(mut("f", "2"), test("f", "2"));
+                let e4 = seq(mut("f", "2"), mut("f", "2"));
+                console.assert(decideLGE(e3, e4) === "=");
+
+                let e5 = seq(star(mut("f", "2")), mut("g", "3"));
+                let e6 = seq(mut("g", "3"), star(mut("f", "2")));
+                console.assert(decideLGE(e5, e6) === "=");
+
+                let e7 = star(alt(mut("f", "2"), mut("g", "3")));
+                let e8 = star(alt(mut("g", "3"), mut("f", "2")));
+                console.assert(decideLGE(e7, e8) === "=");
+
+                let e9 = seq(star(mut("f", "2")), star(mut("g", "3")));
+                let e10 = seq(star(mut("g", "3")), star(mut("f", "2")));
+                console.assert(decideLGE(e9, e10) === "=");
+
+                let e11 = seq(alt(mut("f", "2"), mut("g", "3")), star(mut("f", "4")));
+                let e12 = seq(alt(mut("g", "3"), mut("f", "2")), star(mut("f", "4")));
+                console.assert(decideLGE(e11, e12) === "=");
+
+                let e13 = seq(star(mut("f", "2")), alt(mut("g", "3"), mut("h", "4")));
+                let e14 = seq(star(mut("f", "2")), alt(mut("h", "4"), mut("g", "3")));
+                console.assert(decideLGE(e13, e14) === "=");
+
+                let e15 = seq(star(alt(mut("f", "2"), mut("g", "3"))), mut("h", "4"));
+                let e16 = seq(mut("h", "4"), star(alt(mut("f", "2"), mut("g", "3"))));
+                console.assert(decideLGE(e15, e16) === "=");
+
+                let e17 = seq(star(mut("f", "2")), star(alt(mut("g", "3"), mut("h", "4"))));
+                let e18 = seq(star(alt(mut("g", "3"), mut("h", "4"))), star(mut("f", "2")));
+                console.assert(decideLGE(e17, e18) === "=");
+
+                // f := 2 + f := 3 < f := 2 + f := 2
+                let e19 = alt(mut("f", "2"), mut("f", "3"));
+                let e20 = alt(mut("f", "2"), mut("f", "2"));
+                console.assert(decideLGE(e19, e20) === ">");
+
+                let e23 = star(mut("f", "3"));
+                let e24 = star(mut("f", "2"));
+                console.assert(decideLGE(e23, e24) === "!=");
+
+                let e21 = star(alt(mut("f", "2"), mut("f", "3")));
+                let e22 = star(alt(mut("f", "2"), mut("f", "2")));
+                console.assert(decideLGE(e21, e22) === ">");
+            }
+
+            // Test decide_equivalence_mixed_headers_push_pop
+            function test_decide_equivalence_mixed_headers_push_pop() {
+                let e1 = seq(pop("3"), seq(mut("f", "2"), seq(push("2"), seq(pop("2"), mut("f", "3")))));
+                let e2 = seq(mut("f", "3"), pop("3"));
+                console.assert(decideLGE(e1, e2) === "=");
+            }
+
+            // run the tests
+            test_decide_equivalence_all();
+            test_decide_equivalence_all_pure_headers();
+            test_decide_equivalence_mixed_headers_push_pop();
+        }
+
+        let allExamples = [
+            // --- test_decide_equivalence_all ---
+            // e1 vs e2
+            ["pop(2)* push(2)*", "(push(2) + pop(2))*"],
+            // e1 vs e3
+            ["pop(2)* push(2)*", "push(2)* (pop(2) pop(2))*"],
+            // e1 vs e4
+            ["pop(2)* push(2)*", "(pop(2) pop(2))* push(2)*"],
+            // e1 vs e5
+            ["pop(2)* push(2)*", "(push(2) push(2))* pop(2)*"],
+            // e1 vs e6
+            ["pop(2)* push(2)*", "pop(2)* (push(2) push(2))*"],
+            // e2 vs e3
+            ["(push(2) + pop(2))*", "push(2)* (pop(2) pop(2))*"],
+            // e2 vs e4
+            ["(push(2) + pop(2))*", "(pop(2) pop(2))* push(2)*"],
+            // e2 vs e5
+            ["(push(2) + pop(2))*", "(push(2) push(2))* pop(2)*"],
+            // e2 vs e6
+            ["(push(2) + pop(2))*", "pop(2)* (push(2) push(2))*"],
+            // e3 vs e4
+            ["push(2)* (pop(2) pop(2))*", "(pop(2) pop(2))* push(2)*"],
+            // e3 vs e5
+            ["push(2)* (pop(2) pop(2))*", "(push(2) push(2))* pop(2)*"],
+            // e3 vs e6
+            ["push(2)* (pop(2) pop(2))*", "pop(2)* (push(2) push(2))*"],
+            // e4 vs e5
+            ["(pop(2) pop(2))* push(2)*", "(push(2) push(2))* pop(2)*"],
+            // e4 vs e6
+            ["(pop(2) pop(2))* push(2)*", "pop(2)* (push(2) push(2))*"],
+            // e5 vs e6
+            ["(push(2) push(2))* pop(2)*", "pop(2)* (push(2) push(2))*"],
+
+            // --- test_decide_equivalence_all_pure_headers ---
+            // e1 vs e2
+            ["f:=2 g:=3", "g:=3 f:=2"],
+            // e3 vs e4
+            ["f:=2 f==2", "f:=2 f:=2"],
+            // e5 vs e6
+            ["f:=2* g:=3", "g:=3 f:=2*"],
+            // e7 vs e8
+            ["(f:=2 + g:=3)*", "(g:=3 + f:=2)*"],
+            // e9 vs e10
+            ["f:=2* g:=3*", "g:=3* f:=2*"],
+            // e11 vs e12
+            ["(f:=2 + g:=3) f:=4*", "(g:=3 + f:=2) f:=4*"],
+            // e13 vs e14
+            ["f:=2* (g:=3 + h:=4)", "f:=2* (h:=4 + g:=3)"],
+            // e15 vs e16
+            ["(f:=2 + g:=3)* h:=4", "h:=4 (f:=2 + g:=3)*"],
+            // e17 vs e18
+            ["f:=2* (g:=3 + h:=4)*", "(g:=3 + h:=4)* f:=2*"],
+            // e19 vs e20
+            ["f:=2 + f:=3", "f:=2 + f:=2"],
+            ["f:=2 + f==2", "f:=2"],
+            // e23 vs e24
+            ["f:=3*", "f:=2*"],
+            // e21 vs e22
+            ["(f:=2 + f:=3)*", "(f:=2 + f:=2)*"],
+
+            // --- test_decide_equivalence_mixed_headers_push_pop ---
+            // e1 vs e2
+            ["pop(3) f:=2 push(2) pop(2) f:=3", "f:=3 pop(3)"],
+
+            // more interesting examples
+            [
+                "f:=1 (f==1 f:=2 push(1) + f==2 f:=3 push(2))* f==3",
+                "f:=1 f:=3 push(1) push(2)"
+            ],
+            [
+                "f:=1 (f==1 push(1) + f==1 pop(1))* f:=2",
+                "f:=1 (push(1) + pop(1))* f:=2"
+            ],
+            [
+                "f:=2 push(1)* (f==2 pop(1))*",
+                "f:=2 (push(1) + pop(1))*"
+            ],
+            [
+                "f:=1 push(1)* f:=2",
+                "f:=1 (push(1) + push(2))* f:=2"
+            ]
+        ];
+
+        // tests();
+    </script>
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            margin: 0;
+            padding: 0;
+            color: #333;
+            background-color: #f9f9f9;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .container {
+            width: 95%;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin: 2rem 0;
+            font-weight: 700;
+            font-size: 2.5rem;
+        }
+
+        .content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        #controls {
+            margin-bottom: 2rem;
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+        }
+
+        #randomExample {
+            font-size: 1rem;
+            padding: 5px 12px;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            font-weight: 500;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        #randomExample:hover {
+            background-color: #2980b9;
+        }
+
+        #randomExample:active {
+            transform: translateY(1px);
+        }
+
+        #inputs {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            width: 100%;
+            gap: 1rem;
+        }
+
+        .editor {
+            position: relative;
+            height: 120px;
+            width: 100%;
+            box-sizing: border-box;
+            overflow: visible;
+            background: #fff;
+            border-radius: 8px;
+            border: 1px solid #e1e1e1;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            padding: 1rem;
+            transition: box-shadow 0.3s ease;
+        }
+
+        .editor:hover {
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .editor textarea,
+        .editor .result {
+            position: absolute;
+            line-height: 1.6;
+            font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+            font-size: 16px;
+            top: 16px;
+            left: 16px;
+            right: 16px;
+            bottom: 16px;
+            padding: 0;
+            margin: 0;
+            border: 0;
+            word-wrap: break-word;
+            white-space: pre-wrap;
+            overflow: visible;
+        }
+
+        .editor textarea {
+            background: transparent;
+            color: transparent;
+            caret-color: #333;
+            z-index: 2;
+            resize: none;
+            outline: none;
+        }
+
+        .editor textarea:focus {
+            outline: none;
+        }
+
+        .editor .result {
+            color: transparent;
+            pointer-events: none;
+            z-index: 1;
+            overflow: visible;
+        }
+
+        .correct {
+            color: #333;
+        }
+
+        .incorrect {
+            color: #e74c3c;
+        }
+
+        .rest {
+            position: relative;
+        }
+
+        .message {
+            position: absolute;
+            background-color: #333;
+            color: #fff;
+            text-align: center;
+            padding: 8px 12px;
+            border-radius: 4px;
+            z-index: 100;
+            top: 30px;
+            transform: translateX(-10px);
+            white-space: nowrap;
+            font-size: 14px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .message::after {
+            content: '';
+            position: absolute;
+            border-width: 6px;
+            border-style: solid;
+            border-color: transparent transparent #333 transparent;
+            top: -12px;
+            left: 20px;
+            transform: translateX(-100%);
+        }
+
+        .result.correctstate .message {
+            display: none;
+        }
+
+        .message code {
+            background-color: #444;
+            color: #2ecc71;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+        }
+
+        #comparison {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 120px;
+            font-size: 2rem;
+            width: 60px;
+            color: #2c3e50;
+            font-weight: 500;
+        }
+
+        .counterexample {
+            width: 100%;
+            margin-top: 1.5rem;
+            margin-bottom: 1.5rem;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+            color: #444;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+            box-sizing: border-box;
+        }
+
+        .counterexample-title {
+            font-weight: 600;
+            padding: 0.4rem 0.5rem;
+            border-bottom: 1px solid #e1e1e1;
+            font-size: 1rem;
+            color: #2c3e50;
+            background-color: rgba(52, 152, 219, 0.1);
+            border-top-right-radius: 8px;
+            border-top-left-radius: 8px;
+            text-align: center;
+        }
+
+        .counterexample-content {
+            padding: 0.5rem 0.75rem;
+            font-size: 0.95rem;
+            line-height: 1.5;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+
+        .counterexample-content div {
+            margin-bottom: 0.3rem;
+        }
+
+        /* Spacing for detailed explanation */
+        .counterexample-content .tooltip-container {
+            margin: 0 2px;
+            display: inline-flex;
+        }
+
+        .counterexample-content .tooltip-text {
+            display: inline-flex;
+        }
+
+        .counterexample-content span[style*="white-space: nowrap"] {
+            display: inline-flex;
+            gap: 0;
+        }
+
+        .condensed-counter {
+            background-color: #f1f8e9;
+            padding: 0.3rem;
+            margin-bottom: 0.5rem !important;
+            border-radius: 4px;
+            text-align: center;
+            font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+            display: flex;
+            flex-wrap: nowrap;
+            align-items: center;
+            justify-content: center;
+            gap: 1px;
+        }
+
+        .condensed-counter .stack-value,
+        .condensed-counter .pk-value {
+            margin: 0;
+            padding: 2px 8px;
+            display: inline-block;
+        }
+
+        /* Fix for tooltip spacing issue */
+        .condensed-counter .tooltip-container {
+            margin: 0;
+            padding: 0;
+            display: inline-flex;
+            flex-shrink: 0;
+        }
+
+        .condensed-counter .tooltip-text {
+            display: inline-flex;
+            padding: 0;
+            margin: 0;
+        }
+
+        .transform-label {
+            font-weight: 600;
+            color: #2c3e50;
+            margin: 0;
+            font-size: 0.9rem;
+            padding-right: 1px;
+            margin-left: 2px;
+        }
+
+        .transform-arrow {
+            font-weight: bold;
+            color: #3498db;
+            margin: 0 2px;
+            font-size: 1.1rem;
+        }
+
+        .auto-pk {
+            font-size: 0.9rem;
+            margin: 0;
+            padding: 2px 8px;
+            display: inline-block;
+        }
+
+        /* Tooltip styles */
+        .tooltip-container {
+            display: inline-block;
+            position: relative;
+            cursor: help;
+            margin: 0;
+            padding: 0;
+        }
+
+        .tooltip-text {
+            padding: 4px 8px;
+            color: #2980b9;
+        }
+
+        .tooltip-content {
+            visibility: hidden;
+            position: absolute;
+            bottom: 125%;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #34495e;
+            color: white;
+            text-align: center;
+            border-radius: 6px;
+            padding: 8px 12px;
+            width: max-content;
+            /* max-width: 200px; */
+            z-index: 100;
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-size: 0.85rem;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .tooltip-content::after {
+            content: "";
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            margin-left: -6px;
+            border-width: 6px;
+            border-style: solid;
+            border-color: #34495e transparent transparent transparent;
+        }
+
+        .tooltip-container:hover .tooltip-content {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        .header {
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+            padding: 10px;
+            background-color: #fff;
+            width: 100%;
+        }
+
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            text-align: center;
+        }
+
+        /* Grammar section styles */
+        .grammar-section {
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            margin: 1rem auto 2rem auto;
+            overflow: hidden;
+            max-width: 1200px;
+            box-sizing: border-box;
+        }
+
+        .grammar-content {
+            padding: 0.7rem 1rem 0.3rem 1rem;
+            font-family: 'Inter', sans-serif;
+            font-size: 1rem;
+            color: #34495e;
+            text-align: center;
+        }
+
+        .grammar-content > span {
+            font-weight: 500;
+            display: block;
+            margin-bottom: 0.5rem;
+        }
+
+        .grammar-content code {
+            font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+            background-color: rgba(46, 204, 113, 0.05);
+            border-radius: 4px;
+            padding: 0.3rem 0.5rem;
+            margin-left: 0.3rem;
+        }
+
+        .grammar-tooltips {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 0;
+            width: 100%;
+        }
+
+        .grammar-tooltip {
+            position: relative;
+            display: inline-block;
+        }
+
+        .grammar-term {
+            background-color: #ecf0f1;
+            padding: 5px 12px;
+            border-radius: 4px;
+            font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+            color: #2c3e50;
+            border-left: 3px solid #2ecc71;
+            cursor: help;
+            font-size: 1rem;
+        }
+
+        .grammar-tooltip .tooltip-content {
+            visibility: hidden;
+            position: fixed;  /* Changed from absolute to fixed */
+            z-index: 999;     /* Higher z-index to ensure visibility */
+            bottom: auto;     /* Remove fixed bottom positioning */
+            left: 50%;
+            transform: translateX(-50%);
+            opacity: 0;
+            transition: opacity 0.3s;
+            width: 220px;     /* Reduced width */
+            max-width: 90vw;  /* Responsive max-width */
+            background-color: #34495e;
+            color: #fff;
+            text-align: center;
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.85rem;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            pointer-events: none; /* Prevents tooltip from blocking interactions */
+        }
+
+        .grammar-tooltip .tooltip-content::after {
+            content: "";
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            margin-left: -6px;
+            border-width: 6px;
+            border-style: solid;
+            border-color: #34495e transparent transparent transparent;
+            transform: translateX(-50%); /* Center the arrow */
+        }
+
+        .grammar-tooltip:hover .tooltip-content {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        /* Counterexamples row styles */
+        .counterexamples-row {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            margin: 1.5rem auto;
+            width: 100%;
+            max-width: 1200px;
+        }
+
+        .counterexamples-row .counterexample {
+            width: 48%;
+            margin: 0;
+            box-sizing: border-box;
+            max-width: 580px;
+        }
+
+        .stack-value, .pk-value {
+            background-color: #ecf0f1;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 500;
+            display: inline-flex;
+            margin: 0;
+            white-space: nowrap;
+        }
+
+        /* Additional spacing fixes for counterexample content */
+        .counterexample-content .stack-value,
+        .counterexample-content .pk-value {
+            margin: 0;
+            padding: 2px 6px;
+        }
+
+        /* Normal letter spacing in detailed text */
+        .counterexample-content {
+            letter-spacing: normal;
+        }
+
+        /* This rule is redundant and has been moved above */
+
+        /* Proper spacing for spans */
+        .counterexample-content span {
+            padding: 0;
+        }
+
+        /* Specific styles for condensed view */
+        .condensed-counter .stack-value,
+        .condensed-counter .pk-value {
+            margin: 0;
+            display: inline-flex;
+            border-radius: 3px;
+            padding: 2px 6px;
+        }
+
+        .pk-value {
+            border-left: 3px solid #e74c3c;
+        }
+
+        .stack-value {
+            border-left: 3px solid #2ecc71;
+        }
+
+        .empty-stack, .empty-pk {
+            font-style: italic;
+            color: #7f8c8d;
+        }
+
+        /* Removed different colors for top/bottom of stack as requested */
+        .top-of-stack, .bottom-of-stack {
+            /* Same styling as regular stack values */
+        }
+
+        .mid {
+            width: 50px;
+        }
+
+        #cys {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            margin-top: 3rem;
+            width: 100%;
+            max-width: 1200px;
+            box-sizing: border-box;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        /* Two Column Layout */
+        .two-column-layout {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            width: 100%;
+            margin: 1.5rem auto;
+            max-width: 1200px;
+        }
+
+        .column {
+            width: 44%;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .comparison-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 10%;
+            margin-top: 4rem;
+        }
+        
+        #comparison {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Ensure equal width for all elements in columns */
+        .column > * {
+            width: 100%;
+        }
+
+        .section-title {
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 0.5rem;
+            margin-top: 0.5rem;
+            font-size: 1.1rem;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 0.5rem;
+            text-align: center;
+        }
+
+        #cy1,
+        #cy2 {
+            width: 100%;
+            height: 500px;
+            border: 1px solid #e1e1e1;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            background-color: #fff;
+            box-sizing: border-box;
+        }
+
+        .graph-title {
+            text-align: center;
+            margin-bottom: 0.5rem;
+            color: #555;
+            font-weight: 500;
+            font-size: 1.1rem;
+        }
+
+        .packet-selector-container {
+            max-width: 1200px;
+            width: 100%;
+            margin: 2rem auto 1rem auto;
+            text-align: center;
+            box-sizing: border-box;
+            margin-top: 100px;
+        }
+
+        .packet-selectors {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 1.5rem;
+            margin-top: 1rem;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            padding: 1rem;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+        }
+
+        .packet-selector {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .packet-selector label {
+            font-weight: 500;
+            color: #2c3e50;
+            white-space: nowrap;
+        }
+
+        .packet-selector select {
+            padding: 0.5rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+            background-color: #fff;
+            min-width: 200px;
+        }
+
+        #update-automata {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background-color 0.2s;
+        }
+
+        #update-automata:hover {
+            background-color: #2980b9;
+        }
+
+        .graph-container {
+            width: 48%;
+            box-sizing: border-box;
+            max-width: 580px;
+        }
+
+        footer {
+            margin-top: 3rem;
+            padding: 1rem;
+            text-align: center;
+            color: #7f8c8d;
+            font-size: 0.9rem;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 1240px) {
+            .two-column-layout,
+            .counterexamples-row,
+            #cys {
+                max-width: 95%;
+            }
+        }
+
+        @media (max-width: 992px) {
+            #inputs {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .editor {
+                width: 100%;
+                margin-bottom: 1rem;
+            }
+
+            #comparison {
+                height: 60px;
+                margin: 0.5rem 0;
+            }
+
+            #cys {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            #cy1, #cy2 {
+                width: 100%;
+                margin-bottom: 2rem;
+            }
+
+            .graph-container {
+                width: 100%;
+                margin-bottom: 2rem;
+                box-sizing: border-box;
+            }
+
+            .counterexample {
+                margin-top: 1rem;
+                margin-bottom: 1rem;
+            }
+
+            .counterexample-content {
+                font-size: 0.85rem;
+            }
+
+            .counterexamples-row {
+                flex-direction: column;
+                gap: 1rem;
+            }
+
+            .counterexamples-row .counterexample {
+                width: 100%;
+                max-width: 100%;
+            }
+
+            .packet-selectors {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 1rem;
+            }
+
+            .packet-selector {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 0.5rem;
+            }
+
+            .packet-selector select {
+                width: 100%;
+            }
+
+            .grammar-tooltips {
+                gap: 0.3rem;
+                padding: 0.5rem;
+                justify-content: flex-start;
+            }
+
+            .grammar-section {
+                margin: 0.5rem 0 1.5rem 0;
+            }
+
+            .grammar-content code {
+                font-size: 0.9rem;
+                padding: 0.3rem;
+                display: inline-block;
+                margin-top: 0.3rem;
+                overflow-x: auto;
+                max-width: 100%;
+            }
+
+            .grammar-content > span {
+                line-height: 1.5;
+            }
+        }
+        
+        /* Timing display for equivalence check */
+        .timing {
+            font-size: 0.8rem;
+            color: #7f8c8d;
+            margin-top: 5px;
+            font-weight: normal;
+            display: block;
+        }
+        
+        /* Controls container and benchmark toggle */
+        .controls-container {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-top: 10px;
+        }
+        
+        .benchmark-toggle {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .benchmark-toggle label {
+            font-size: 0.9rem;
+            color: #2c3e50;
+            cursor: pointer;
+        }
+        
+        #benchmarkMode {
+            cursor: pointer;
+        }
+        
+        /* Style for UI elements when benchmark mode is active */
+        .benchmark-disabled {
+            opacity: 0.5;
+            pointer-events: none;
+            position: relative;
+        }
+        
+        .benchmark-disabled::after {
+            content: "Disabled in benchmark mode";
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            z-index: 100;
+            white-space: nowrap;
+        }
+        
+        /* Benchmark results modal */
+        .benchmark-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .benchmark-modal.active {
+            display: flex;
+        }
+        
+        .benchmark-modal-content {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            max-width: 90%;
+            max-height: 90%;
+            overflow-y: auto;
+            width: 600px;
+        }
+        
+        .benchmark-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+        
+        .benchmark-modal-title {
+            font-size: 1.4rem;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        
+        .benchmark-modal-close {
+            cursor: pointer;
+            font-size: 1.5rem;
+            color: #7f8c8d;
+        }
+        
+        .benchmark-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 15px;
+        }
+        
+        .benchmark-table th, .benchmark-table td {
+            border: 1px solid #ddd;
+            padding: 8px 12px;
+            text-align: left;
+        }
+        
+        .benchmark-table th {
+            background-color: #f2f2f2;
+            font-weight: 600;
+        }
+        
+        .benchmark-table tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        
+        .benchmark-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+        
+        .benchmark-actions button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        
+        .benchmark-actions button:hover {
+            background-color: #2980b9;
+        }
+        
+        /* Benchmark tabs styling */
+        .benchmark-tabs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 10px;
+        }
+        
+        .benchmark-tab-btn {
+            padding: 6px 12px;
+            background-color: #f2f2f2;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+        
+        .benchmark-tab-btn:hover {
+            background-color: #e0e0e0;
+        }
+        
+        .benchmark-tab-btn.active {
+            background-color: #3498db;
+            color: white;
+            border-color: #2980b9;
+        }
+        
+        /* Benchmark report styling */
+        #benchmark-report {
+            margin-bottom: 20px;
+        }
+        
+        .benchmark-type-section {
+            margin-bottom: 30px;
+            display: none;
+        }
+        
+        .benchmark-type-section.active {
+            display: block;
+        }
+        
+        .benchmark-type-description {
+            margin-bottom: 15px;
+            line-height: 1.5;
+        }
+        
+        .benchmark-type-section h3 {
+            margin-bottom: 10px;
+            color: #2c3e50;
+            font-size: 1.3rem;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 5px;
+        }
+        
+        #all-results-view {
+            display: none;
+        }
+        
+        #all-results-view.active {
+            display: block;
+        }
+    </style>
+</head>
+
+<body>
+        <div class="header">
+        <div class="header-content">
+        <h1>StacKAT Playground</h1>
+        <p><b>In this playground you can enter two StacKAT expressions and see if they are equivalent.
+            If they are inequivalent, the playground will show counter examples.
+            Verify that this correctly implements a decision procedure for the semantics of Figure 1 in the paper.</b></p>
+
+        <div class="grammar-section">
+            <div class="grammar-content">
+                <div class="grammar-tooltips">
+                    <b>Expression Syntax: </b>
+                    <div class="grammar-tooltip">
+                        <span class="grammar-term">0</span>
+                        <span class="tooltip-content">Drop packet</span>
+                    </div>
+                    <div class="grammar-tooltip">
+                        <span class="grammar-term">1</span>
+                        <span class="tooltip-content">Do nothing</span>
+                    </div>
+                    <div class="grammar-tooltip">
+                        <span class="grammar-term">push(n)</span>
+                        <span class="tooltip-content">Push value n onto the stack</span>
+                    </div>
+                    <div class="grammar-tooltip">
+                        <span class="grammar-term">pop(n)</span>
+                        <span class="tooltip-content">Pop value n from the stack</span>
+                    </div>
+                    <div class="grammar-tooltip">
+                        <span class="grammar-term">x:=n</span>
+                        <span class="tooltip-content">Set packet header x to n</span>
+                    </div>
+                    <div class="grammar-tooltip">
+                        <span class="grammar-term">x==n</span>
+                        <span class="tooltip-content">Test if packet header x equals n</span>
+                    </div>
+                    <div class="grammar-tooltip">
+                        <span class="grammar-term">x!=n</span>
+                        <span class="tooltip-content">Test if packet header x does not equal n</span>
+                    </div>
+                    <div class="grammar-tooltip">
+                        <span class="grammar-term">e+e</span>
+                        <span class="tooltip-content">Nondeterministic choice between expressions</span>
+                    </div>
+                    <div class="grammar-tooltip">
+                        <span class="grammar-term">e e</span>
+                        <span class="tooltip-content">Sequence: do first expression followed by second</span>
+                    </div>
+                    <div class="grammar-tooltip">
+                        <span class="grammar-term">e*</span>
+                        <span class="tooltip-content">Kleene star: repeat expression zero or more times</span>
+                    </div>
+                    <div class="controls-container">
+                        <button id="randomExample">Random Example</button>
+                        <div class="benchmark-toggle">
+                            <input type="checkbox" id="benchmarkMode" />
+                            <label for="benchmarkMode">Benchmark Mode</label>
+                        </div>
+                        <button id="runBenchmarks">Run Benchmarks</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+            </div>
+        </div>
+
+    <div class="container">
+        <div class="two-column-layout">
+            <div class="column left-column">
+                <div class="section-title">Left Expression</div>
+                <div class="editor" id="editor1">
+                    <pre class="result"><span class="correct"></span><span class="rest"><span class="message"></span><span class="incorrect"></span></span></pre>
+                    <textarea class="expr" placeholder="Enter first expression">pop(1)* push(1)</textarea>
+                </div>
+            </div>
+
+            <div class="comparison-container">
+                <div id="comparison">=</div>
+            </div>
+
+            <div class="column right-column">
+                <div class="section-title">Right Expression</div>
+                <div class="editor" id="editor2">
+                    <pre class="result"><span class="correct"></span><span class="rest"><span class="message"></span><span class="incorrect"></span></span></pre>
+                    <textarea class="expr" placeholder="Enter second expression">push(1)* pop(1)</textarea>
+                </div>
+            </div>
+        </div>
+
+            <div class="counterexamples-row">
+                <div id="counterexampleA" class="counterexample">
+                    <div class="counterexample-title">Counterexample (Left ⊃ Right)</div>
+                    <div class="counterexample-content">Analyzing expressions...</div>
+                </div>
+
+                <div id="counterexampleB" class="counterexample">
+                    <div class="counterexample-title">Counterexample (Left ⊂ Right)</div>
+                    <div class="counterexample-content">Analyzing expressions...</div>
+                </div>
+            </div>
+
+            <div class="packet-selector-container">
+                <div class="section-title">Automata</div>
+                <div class="packet-selectors">
+                    <div class="packet-selector">
+                        <label for="input-packet">Input Packet:</label>
+                        <select id="input-packet"></select>
+                    </div>
+                    <div class="packet-selector">
+                        <label for="output-packet">Output Packet:</label>
+                        <select id="output-packet"></select>
+                    </div>
+                    <button id="update-automata">Update Automata</button>
+                </div>
+            </div>
+
+            <div id="cys">
+                <div class="graph-container">
+                    <div class="graph-title">Left Expression Automaton</div>
+                    <div id="cy1"></div>
+                </div>
+
+                <div class="graph-container">
+                    <div class="graph-title">Right Expression Automaton</div>
+                    <div id="cy2"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Benchmark Results Modal -->
+    <div class="benchmark-modal" id="benchmarkModal">
+        <div class="benchmark-modal-content">
+            <div class="benchmark-modal-header">
+                <div class="benchmark-modal-title">StacKAT Benchmark Report</div>
+                <div class="benchmark-modal-close">&times;</div>
+            </div>
+            <div class="benchmark-modal-body">
+                <p>This report shows the performance of the StacKAT equivalence checker with different types of expressions.</p>
+                
+                <div class="benchmark-tabs">
+                    <button class="benchmark-tab-btn active" data-type="all">All Results</button>
+                    <button class="benchmark-tab-btn" data-type="original">Header-Push/Pop</button>
+                    <button class="benchmark-tab-btn" data-type="nestedAlt">Nested Alt</button>
+                    <button class="benchmark-tab-btn" data-type="stackDepth">Stack Depth</button>
+                    <button class="benchmark-tab-btn" data-type="kleeneStar">Kleene Star</button>
+                    <button class="benchmark-tab-btn" data-type="packetHeader">Header Checks</button>
+                </div>
+                
+                <div id="benchmark-report">
+                    <!-- Report content will be dynamically generated here -->
+                </div>
+                
+                <div id="all-results-view">
+                    <h3>All Benchmark Results</h3>
+                    <table class="benchmark-table" id="benchmarkTable">
+                        <thead>
+                            <tr>
+                                <th>Type</th>
+                                <th>n</th>
+                                <th>Parameter</th>
+                                <th>Time (ms)</th>
+                                <th>Result</th>
+                            </tr>
+                        </thead>
+                        <tbody id="benchmarkResults">
+                            <!-- Results will be populated here dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="benchmark-actions">
+                <button id="copyAsCsv">Copy as CSV</button>
+                <button id="copyAsMarkdown">Copy as Markdown Report</button>
+                <button id="closeBenchmark">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Fix tooltip positioning
+        document.addEventListener('DOMContentLoaded', function() {
+            const grammarTooltips = document.querySelectorAll('.grammar-tooltip');
+
+            grammarTooltips.forEach(tooltip => {
+                const tooltipContent = tooltip.querySelector('.tooltip-content');
+
+                tooltip.addEventListener('mouseenter', function(e) {
+                    const rect = tooltip.getBoundingClientRect();
+                    const tooltipRect = tooltipContent.getBoundingClientRect();
+
+                    // Position above the term with a small gap
+                    tooltipContent.style.top = (rect.top - tooltipRect.height - 15) + 'px';
+                    tooltipContent.style.left = (rect.left + rect.width/2) + 'px';
+                });
+            });
+        });
+
+        let currentExampleIndex = 0;
+
+        function shiftExample(delta) {
+            currentExampleIndex = (currentExampleIndex + delta + allExamples.length) % allExamples.length;
+            let [expr1, expr2] = allExamples[currentExampleIndex];
+            document.querySelector('#editor1 .expr').value = expr1;
+            document.querySelector('#editor2 .expr').value = expr2;
+            document.querySelector('#editor1 .expr').dispatchEvent(new Event('input'));
+            document.querySelector('#editor2 .expr').dispatchEvent(new Event('input'));
+        }
+
+        document.getElementById('randomExample').addEventListener('click', () => {
+            currentExampleIndex = Math.floor(Math.random() * allExamples.length);
+            shiftExample(0);
+        });
+        
+        // Benchmark mode toggle handler
+        document.getElementById('benchmarkMode').addEventListener('change', function(e) {
+            const benchmarkMode = e.target.checked;
+            const counterexamples = document.querySelectorAll('.counterexample');
+            const cyElements = document.querySelectorAll('#cy1, #cy2');
+            
+            if (benchmarkMode) {
+                // Add dimming class to UI elements when benchmark mode is active
+                counterexamples.forEach(elem => elem.classList.add('benchmark-disabled'));
+                cyElements.forEach(elem => elem.classList.add('benchmark-disabled'));
+            } else {
+                // Remove dimming when benchmark mode is inactive
+                counterexamples.forEach(elem => elem.classList.remove('benchmark-disabled'));
+                cyElements.forEach(elem => elem.classList.remove('benchmark-disabled'));
+                // Force a recompute to update all UI elements
+                recompute();
+            }
+        });
+        
+        // Benchmark functions
+        
+        // 1. Original Benchmark - Tests header-controlled push/pop operations
+        function generateOriginalBenchmark(n) {
+            // Creates expression: (f1==0 push(1) + f1==1 push(1)) ... (fn==0 push(0) + fn==1 push(1)) (pop(0) + pop(1)) ... (pop(0) + pop(1))
+            
+            // First create all the (fi==0 push(0) + fi==1 push(1)) parts
+            let testExpression = one;
+            for (let i = 1; i <= n; i++) {
+                const varName = `f${i}`;
+                const testPart = alt(
+                    seq(test(varName, 0), push(0)),
+                    seq(test(varName, 1), push(1))
+                );
+                testExpression = seq(testExpression, testPart);
+            }
+            
+            // Then create all the (pop(0) + pop(1)) parts
+            let popExpression = one;
+            for (let i = 1; i <= n; i++) {
+                const popPart = alt(pop(0), pop(1));
+                popExpression = seq(popExpression, popPart);
+            }
+            
+            // Combine the two parts
+            return seq(testExpression, popExpression);
+        }
+        
+        // 2. Nested Alternation Benchmark - Tests deeply nested choices
+        function generateNestedAlternationBenchmark(n) {
+            // Creates expression: (... (((push(1) + push(2)) + push(3)) + ...) + push(n))
+            if (n <= 0) return one;
+            
+            let expr = push(1);
+            for (let i = 2; i <= n; i++) {
+                expr = alt(expr, push(i));
+            }
+            
+            return expr;
+        }
+        
+        function generateNestedAlternationBenchmarkReverse(n) {
+            // Creates expression in reverse order: (... (push(n) + (push(n-1) + ... + (push(2) + push(1))...))
+            if (n <= 0) return one;
+            
+            let expr = push(n);
+            for (let i = n-1; i >= 1; i--) {
+                expr = alt(expr, push(i));
+            }
+            
+            return expr;
+        }
+        
+        // 3. Stack Depth Benchmark - Tests deep stack operations
+        function generateStackDepthBenchmark(n) {
+            // Creates expression: push(1) push(2) ... push(n) pop(n) ... pop(2) pop(1)
+            let pushExpr = one;
+            let popExpr = one;
+            
+            for (let i = 1; i <= n; i++) {
+                pushExpr = seq(pushExpr, push(i));
+                popExpr = seq(pop(i), popExpr); // Note the reverse order for pops
+            }
+            
+            return seq(pushExpr, popExpr);
+        }
+        
+        // 4. Kleene Star Nesting Benchmark - Tests nested repetition operations
+        function generateKleeneStarNestingBenchmark(n) {
+            // Creates expression: (... (((push(1))*)*)* ...)*
+            let expr = push(1);
+            
+            for (let i = 0; i < n; i++) {
+                expr = star(expr);
+            }
+            
+            return expr;
+        }
+        
+        // 5. Packet Header Independence Benchmark - Tests many independent header checks
+        function generatePacketHeaderBenchmark(n) {
+            // Creates expression: (h₁==v₁) (h₂==v₂)... (hₙ==vₙ) vs (hₙ==vₙ)... (h₂==v₂) (h₁==v₁)
+            let forwardExpr = one;
+            let reverseExpr = one;
+            
+            for (let i = 1; i <= n; i++) {
+                const headerName = `h${i}`;
+                forwardExpr = seq(forwardExpr, test(headerName, i));
+                reverseExpr = seq(test(headerName, i), reverseExpr); // Reverse order
+            }
+            
+            return [forwardExpr, reverseExpr]; // Return both expressions for comparison
+        }
+        
+        // 6. Mixed Operations Random Benchmark - Tests randomly generated expressions
+        function generateRandomExpr(depth, complexity) {
+            // Base case: at max depth or with some probability, generate a simple operation
+            if (depth <= 0 || Math.random() < 0.3) {
+                const r = Math.random();
+                
+                if (r < 0.25) {
+                    return push(Math.floor(Math.random() * complexity) + 1);
+                } else if (r < 0.5) {
+                    return pop(Math.floor(Math.random() * complexity) + 1);
+                } else if (r < 0.75) {
+                    const headerName = `h${Math.floor(Math.random() * complexity) + 1}`;
+                    const value = Math.floor(Math.random() * 2); // 0 or 1
+                    return test(headerName, value);
+                } else {
+                    return one;
+                }
+            }
+            
+            // Recursive case: generate a composite expression
+            const r = Math.random();
+            
+            if (r < 0.4) {
+                // Sequence
+                return seq(
+                    generateRandomExpr(depth - 1, complexity),
+                    generateRandomExpr(depth - 1, complexity)
+                );
+            } else if (r < 0.7) {
+                // Alternation
+                return alt(
+                    generateRandomExpr(depth - 1, complexity),
+                    generateRandomExpr(depth - 1, complexity)
+                );
+            } else {
+                // Kleene star
+                return star(generateRandomExpr(depth - 1, complexity));
+            }
+        }
+        
+        function generateRandomBenchmark(n) {
+            // n determines both depth and complexity
+            // Generate two random expressions with similar complexity
+            // but different structure
+            const expr1 = generateRandomExpr(n, n);
+            const expr2 = generateRandomExpr(n, n);
+            
+            return [expr1, expr2];
+        }
+        
+        // Benchmark runner for a single type
+        function runSingleBenchmark(n, benchmarkType) {
+            let expr1, expr2;
+            let benchmarkName, paramDesc;
+            
+            // Generate expressions based on benchmark type
+            switch (benchmarkType) {
+                case 'original':
+                    benchmarkName = "Header-Controlled Push/Pop";
+                    paramDesc = "Header/Stack Pairs";
+                    expr1 = generateOriginalBenchmark(n);
+                    expr2 = one;
+                    break;
+                    
+                case 'nestedAlt':
+                    benchmarkName = "Nested Alternation";
+                    paramDesc = "Alternation Depth";
+                    expr1 = generateNestedAlternationBenchmark(n);
+                    // Generate second expression in reverse order for a nontrivial check
+                    expr2 = generateNestedAlternationBenchmarkReverse(n);
+                    break;
+                    
+                case 'stackDepth':
+                    benchmarkName = "Stack Depth";
+                    paramDesc = "Stack Depth";
+                    expr1 = generateStackDepthBenchmark(n);
+                    expr2 = one; // Test against identity
+                    break;
+                    
+                case 'kleeneStar':
+                    benchmarkName = "Kleene Star Nesting";
+                    paramDesc = "Star Nesting Depth";
+                    expr1 = generateKleeneStarNestingBenchmark(n);
+                    expr2 = generateKleeneStarNestingBenchmark(1); // Compare with single star
+                    break;
+                    
+                case 'packetHeader':
+                    benchmarkName = "Packet Header Independence";
+                    paramDesc = "Header Checks";
+                    [expr1, expr2] = generatePacketHeaderBenchmark(n);
+                    break;
+                    
+                default:
+                    throw new Error(`Unknown benchmark type: ${benchmarkType}`);
+            }
+            
+            // Measure the time for the equivalence check
+            const startTime = performance.now();
+            const result = decideLGE(expr1, expr2);
+            const endTime = performance.now();
+            const executionTime = endTime - startTime;
+            
+            return {
+                type: benchmarkType,
+                name: benchmarkName,
+                paramName: paramDesc,
+                n,
+                time: executionTime,
+                result
+            };
+        }
+        
+        function runAllBenchmarkTypes() {
+            // Enable benchmark mode automatically
+            document.getElementById('benchmarkMode').checked = true;
+            document.getElementById('benchmarkMode').dispatchEvent(new Event('change'));
+            
+            const results = [];
+            const benchmarkTypes = ['original', 'nestedAlt', 'stackDepth', 'kleeneStar', 'packetHeader'];
+            
+            // Run each benchmark type with increasing n
+            for (const type of benchmarkTypes) {
+                let n = 1;
+                let lastExecutionTime = 0;
+                
+                const typeResults = [];
+                
+                // Run until execution time exceeds threshold or n reaches limit
+                while (lastExecutionTime < 1000 && n <= 20) {
+                    try {
+                        const result = runSingleBenchmark(n, type);
+                        typeResults.push(result);
+                        lastExecutionTime = result.time;
+                        
+                        // Safety break if time jumps too much
+                        if (lastExecutionTime > 5000) break;
+                        
+                        n++;
+                    } catch (error) {
+                        console.error(`Error in benchmark ${type} with n=${n}:`, error);
+                        break;
+                    }
+                }
+                
+                results.push(...typeResults);
+            }
+            
+            return results;
+        }
+        
+        // Benchmark type descriptions
+        const benchmarkDescriptions = {
+            original: {
+                title: "Header-Controlled Push/Pop Benchmark",
+                description: "This benchmark tests equivalence checking with expressions that combine header tests with push and pop operations. It creates expressions of the form <code>(f1==0 push(0) + f1==1 push(1)) ... (fn==0 push(0) + fn==1 push(1)) (pop(0) + pop(1)) ... (pop(0) + pop(1))</code> and compares them with the identity expression <code>1</code>. This models real-world scenarios where packet processing depends on header fields.<br><br><strong>Example queries (n=1,2,3):</strong><br><code>n=1: (f1==0 push(0) + f1==1 push(1)) (pop(0) + pop(1)) ≡ 1</code><br><code>n=2: (f1==0 push(0) + f1==1 push(1)) (f2==0 push(0) + f2==1 push(1)) (pop(0) + pop(1)) (pop(0) + pop(1)) ≡ 1</code><br><code>n=3: (f1==0 push(0) + f1==1 push(1)) (f2==0 push(0) + f2==1 push(1)) (f3==0 push(0) + f3==1 push(1)) (pop(0) + pop(1)) (pop(0) + pop(1)) (pop(0) + pop(1)) ≡ 1</code>",
+                param: "Header/Stack Pairs"
+            },
+            nestedAlt: {
+                title: "Nested Alternation Benchmark",
+                description: "This benchmark tests how deeply nested choice operations affect performance. It creates expressions with increasing nesting depth of alternation operations and compares left-to-right nesting with right-to-left nesting. This tests the algorithm's performance with complex branching structures.<br><br><strong>Example queries (n=1,2,3):</strong><br><code>n=1: push(1) ≡ push(1)</code><br><code>n=2: (push(1) + push(2)) ≡ (push(2) + push(1))</code><br><code>n=3: ((push(1) + push(2)) + push(3)) ≡ (push(3) + (push(2) + push(1)))</code>",
+                param: "Alternation Depth"
+            },
+            stackDepth: {
+                title: "Stack Depth Benchmark",
+                description: "This benchmark tests how stack depth impacts performance. It creates expressions that push values onto the stack and then pop them off in reverse order, and tests their equivalence to the identity expression <code>1</code>. This is crucial for understanding performance with deep stack operations.<br><br><strong>Example queries (n=1,2,3):</strong><br><code>n=1: push(1) pop(1) ≡ 1</code><br><code>n=2: push(1) push(2) pop(2) pop(1) ≡ 1</code><br><code>n=3: push(1) push(2) push(3) pop(3) pop(2) pop(1) ≡ 1</code>",
+                param: "Stack Depth"
+            },
+            kleeneStar: {
+                title: "Kleene Star Nesting Benchmark",
+                description: "This benchmark tests nested repetition operations with Kleene star. It creates expressions with increasing star nesting depth and compares them with a single star nesting to test the equivalence: <code>(... (((push(1))*)*)* ...)* ≡ (push(1))*</code>. This tests how the algorithm handles state explosion patterns caused by nested repetition.<br><br><strong>Example queries (n=1,2,3):</strong><br><code>n=1: (push(1))* ≡ (push(1))*</code><br><code>n=2: ((push(1))*)*  ≡ (push(1))*</code><br><code>n=3: (((push(1))*)*)*  ≡ (push(1))*</code>",
+                param: "Star Nesting Depth"
+            },
+            packetHeader: {
+                title: "Packet Header Independence Benchmark",
+                description: "This benchmark tests performance with many independent packet header operations. It creates two expressions with the header checks in different orders to test commutativity: <code>(h₁==v₁) (h₂==v₂)... (hₙ==vₙ) ≡ (hₙ==vₙ)... (h₂==v₂) (h₁==v₁)</code>. This tests how the algorithm handles expressions with many independent header checks.<br><br><strong>Example queries (n=1,2,3):</strong><br><code>n=1: (h1==1) ≡ (h1==1)</code><br><code>n=2: (h1==1) (h2==2) ≡ (h2==2) (h1==1)</code><br><code>n=3: (h1==1) (h2==2) (h3==3) ≡ (h3==3) (h2==2) (h1==1)</code>",
+                param: "Header Checks"
+            }
+        };
+        
+        function createBenchmarkTypeReport(results, type) {
+            const typeResults = results.filter(r => r.type === type);
+            if (typeResults.length === 0) return '';
+            
+            const desc = benchmarkDescriptions[type];
+            if (!desc) return '';
+            
+            let html = `
+                <div class="benchmark-type-section" id="benchmark-section-${type}">
+                    <h3>${desc.title}</h3>
+                    <div class="benchmark-type-description">
+                        ${desc.description}
+                    </div>
+                    <table class="benchmark-table">
+                        <thead>
+                            <tr>
+                                <th>n</th>
+                                <th>${desc.param}</th>
+                                <th>Time (ms)</th>
+                                <th>Result</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+            
+            typeResults.forEach(result => {
+                html += `
+                    <tr>
+                        <td>${result.n}</td>
+                        <td>${result.n} ${result.paramName}</td>
+                        <td>${result.time.toFixed(2)}</td>
+                        <td>${result.result}</td>
+                    </tr>
+                `;
+            });
+            
+            html += `
+                        </tbody>
+                    </table>
+                </div>
+            `;
+            
+            return html;
+        }
+        
+        function displayBenchmarkResults(results, filterType = 'all') {
+            // Generate detailed reports for each benchmark type
+            const reportDiv = document.getElementById('benchmark-report');
+            const allResultsDiv = document.getElementById('all-results-view');
+            const tbody = document.getElementById('benchmarkResults');
+            
+            // Clear previous content
+            reportDiv.innerHTML = '';
+            tbody.innerHTML = '';
+            
+            // Get unique benchmark types
+            const benchmarkTypes = [...new Set(results.map(r => r.type))];
+            
+            // Create report sections for each type
+            benchmarkTypes.forEach(type => {
+                const typeReport = createBenchmarkTypeReport(results, type);
+                reportDiv.innerHTML += typeReport;
+            });
+            
+            // Show all results in the table
+            results.forEach(result => {
+                const row = document.createElement('tr');
+                
+                row.innerHTML = `
+                    <td>${result.name}</td>
+                    <td>${result.n}</td>
+                    <td>${result.n} ${result.paramName}</td>
+                    <td>${result.time.toFixed(2)}</td>
+                    <td>${result.result}</td>
+                `;
+                
+                // Add data attribute for potential filtering
+                row.dataset.type = result.type;
+                
+                tbody.appendChild(row);
+            });
+            
+            // Show the modal
+            document.getElementById('benchmarkModal').classList.add('active');
+            
+            // Update active tab button
+            document.querySelectorAll('.benchmark-tab-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.type === filterType);
+            });
+            
+            // Show/hide appropriate sections based on filter type
+            if (filterType === 'all') {
+                // Show all results table
+                allResultsDiv.classList.add('active');
+                
+                // Hide all type sections
+                document.querySelectorAll('.benchmark-type-section').forEach(section => {
+                    section.classList.remove('active');
+                });
+            } else {
+                // Hide all results table
+                allResultsDiv.classList.remove('active');
+                
+                // Hide all type sections first
+                document.querySelectorAll('.benchmark-type-section').forEach(section => {
+                    section.classList.remove('active');
+                });
+                
+                // Show only the selected type section
+                const selectedSection = document.getElementById(`benchmark-section-${filterType}`);
+                if (selectedSection) {
+                    selectedSection.classList.add('active');
+                }
+            }
+        }
+        
+        function resultsToCSV(results) {
+            const headers = ['Type', 'Name', 'n', 'Parameter', 'Time (ms)', 'Result'];
+            let csv = headers.join(',') + '\n';
+            
+            results.forEach(result => {
+                const row = [
+                    result.type,
+                    result.name,
+                    result.n,
+                    `${result.n} ${result.paramName}`,
+                    result.time.toFixed(2),
+                    result.result
+                ];
+                csv += row.join(',') + '\n';
+            });
+            
+            return csv;
+        }
+        
+        // Benchmark modal event handlers
+        document.getElementById('runBenchmarks').addEventListener('click', async function() {
+            // Show a loading indicator
+            const oldText = this.textContent;
+            this.textContent = 'Running...';
+            this.disabled = true;
+            
+            // Use setTimeout to allow UI to update before running benchmarks
+            setTimeout(() => {
+                try {
+                    const results = runAllBenchmarkTypes();
+                    displayBenchmarkResults(results);
+                    
+                    // Store results for CSV export
+                    window.benchmarkResults = results;
+                } catch (error) {
+                    console.error('Benchmark error:', error);
+                    alert('An error occurred while running benchmarks: ' + error.message);
+                } finally {
+                    // Reset button
+                    this.textContent = oldText;
+                    this.disabled = false;
+                }
+            }, 50);
+        });
+        
+        // Tab button event handlers
+        document.querySelectorAll('.benchmark-tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const filterType = btn.dataset.type;
+                
+                if (window.benchmarkResults) {
+                    displayBenchmarkResults(window.benchmarkResults, filterType);
+                }
+            });
+        });
+        
+        document.getElementById('copyAsCsv').addEventListener('click', function() {
+            if (!window.benchmarkResults) return;
+            
+            const csv = resultsToCSV(window.benchmarkResults);
+            navigator.clipboard.writeText(csv).then(() => {
+                alert('Results copied to clipboard as CSV');
+            }).catch(err => {
+                console.error('Failed to copy CSV:', err);
+                alert('Failed to copy to clipboard. See console for details.');
+            });
+        });
+        
+        function generateMarkdownReport(results) {
+            if (!results || results.length === 0) return '';
+            
+            let markdown = '# StacKAT Equivalence Checking Benchmark Report\n\n';
+            markdown += 'This report shows the performance of the StacKAT equivalence checker with different types of expressions.\n\n';
+            
+            // Get unique benchmark types
+            const benchmarkTypes = [...new Set(results.map(r => r.type))];
+            
+            // Generate a section for each benchmark type
+            for (const type of benchmarkTypes) {
+                const typeResults = results.filter(r => r.type === type);
+                if (typeResults.length === 0) continue;
+                
+                const desc = benchmarkDescriptions[type];
+                if (!desc) continue;
+                
+                markdown += `## ${desc.title}\n\n`;
+                
+                // Clean HTML description and convert to markdown
+                let description = desc.description
+                    .replace(/<br><br>/g, '\n\n')
+                    .replace(/<br>/g, '\n')
+                    .replace(/<strong>(.*?)<\/strong>/g, '**$1**')
+                    .replace(/<code>(.*?)<\/code>/g, '`$1`');
+                
+                markdown += `${description}\n\n`;
+                
+                // Generate results table
+                markdown += `### Results\n\n`;
+                markdown += `| n | ${desc.param} | Time (ms) | Result |\n`;
+                markdown += `|---|---|---|---|\n`;
+                
+                typeResults.forEach(result => {
+                    markdown += `| ${result.n} | ${result.n} ${result.paramName} | ${result.time.toFixed(2)} | ${result.result} |\n`;
+                });
+                
+                markdown += '\n';
+            }
+            
+            markdown += '---\n';
+            markdown += 'Generated with StacKAT Playground Benchmarking Tool\n';
+            
+            return markdown;
+        }
+        
+        document.getElementById('copyAsMarkdown').addEventListener('click', function() {
+            if (!window.benchmarkResults) return;
+            
+            const markdown = generateMarkdownReport(window.benchmarkResults);
+            navigator.clipboard.writeText(markdown).then(() => {
+                alert('Full benchmark report copied to clipboard as Markdown');
+            }).catch(err => {
+                console.error('Failed to copy Markdown:', err);
+                alert('Failed to copy to clipboard. See console for details.');
+            });
+        });
+        
+        document.getElementById('closeBenchmark').addEventListener('click', function() {
+            document.getElementById('benchmarkModal').classList.remove('active');
+        });
+        
+        document.querySelector('.benchmark-modal-close').addEventListener('click', function() {
+            document.getElementById('benchmarkModal').classList.remove('active');
+        });
+
+        function mkEditor(selector, callback) {
+            const editor = document.querySelector(selector);
+            const expr = editor.querySelector('.expr');
+            expr.addEventListener('input', () => {
+                let input = expr.value;
+                try {
+                    let result = parse(input);
+                    editor.querySelector('.correct').innerText = input;
+                    editor.querySelector('.incorrect').innerText = '';
+                    editor.querySelector('.message').innerText = '';
+                    editor.querySelector('.result').classList.toggle('correctstate', true);
+                    callback(result);
+                } catch (e) {
+                    if (!(e instanceof ParseError)) throw e;
+                    let index = e.index;
+                    let correct = e.input.slice(0, index);
+                    let incorrect = e.input.slice(index);
+                    editor.querySelector('.correct').innerText = correct;
+                    editor.querySelector('.incorrect').innerText = incorrect;
+                    editor.querySelector('.message').innerHTML = e.message;
+                    editor.querySelector('.result').classList.toggle('correctstate', false);
+                }
+            });
+            setTimeout(() => expr.dispatchEvent(new Event('input')), 0);
+        }
+        var result1 = null;
+        var result2 = null;
+        function minautemp(result, values) {
+            return minaut(result, values, new Map(), new Map());
+        }
+        function pathToStackPair(path) {
+            if (path === false) return false;
+            let input = []
+            let output = [];
+            for (let elem of path) {
+                let left = elem[1];
+                let right = elem[2];
+                if (left[0] == 'pop') {
+                    input.push(left[1]);
+                }
+                if (right[0] == 'push') {
+                    output.push(right[1]);
+                }
+            }
+            // reverse them both
+            input = input.reverse();
+            output = output.reverse();
+            return [input, output];
+        }
+        function displayCy(cy, aut) {
+            let cyElems = automatonToCytoscape(aut);
+            cy.json({ elements: cyElems });
+
+            // Clear any previous elements if automaton is empty
+            if (cyElems.nodes.length === 0) {
+                cy.elements().remove();
+                return;
+            }
+
+            cy.layout({
+                name: 'cose',
+                nodeRepulsion: function (node) { return 20000000; },
+                idealEdgeLength: function (edge) { return 60; },
+                padding: 40,
+                animate: false,
+                componentSpacing: 100,
+                randomize: true,
+                fit: true
+            }).run();
+
+            // After layout completes, fit the graph in the viewport
+            setTimeout(() => {
+                cy.fit();
+                cy.center();
+            }, 100);
+
+            // Add tooltip event handlers
+            cy.on('mouseover', 'node', function(e) {
+                const node = e.target;
+                const tooltip = node.data('tooltip');
+
+                if (tooltip) {
+                    const tooltipDiv = document.getElementById('cy-tooltip');
+                    tooltipDiv.innerHTML = tooltip;
+                    tooltipDiv.style.display = 'block';
+
+                    // Position the tooltip near the node
+                    const renderedPosition = node.renderedPosition();
+                    const containerRect = cy.container().getBoundingClientRect();
+
+                    tooltipDiv.style.left = (containerRect.left + renderedPosition.x + 10) + 'px';
+                    tooltipDiv.style.top = (containerRect.top + 500 + renderedPosition.y - 40) + 'px';
+
+                    // Add a small delay before showing to avoid flickering
+                    setTimeout(() => {
+                        tooltipDiv.style.opacity = '1';
+                    }, 50);
+                }
+            });
+
+            cy.on('mouseout', 'node', function() {
+                const tooltipDiv = document.getElementById('cy-tooltip');
+                tooltipDiv.style.opacity = '0';
+
+                // Wait for transition to complete before hiding
+                setTimeout(() => {
+                    tooltipDiv.style.display = 'none';
+                }, 200);
+            });
+
+            // Also hide tooltip when panning or zooming
+            cy.on('pan zoom', function() {
+                const tooltipDiv = document.getElementById('cy-tooltip');
+                tooltipDiv.style.opacity = '0';
+                tooltipDiv.style.display = 'none';
+            });
+        }
+        // Global variables for packet configurations
+        let allPackets = [];
+        let selectedInputPacket = null;
+        let selectedOutputPacket = null;
+
+        // Function to update packet selectors
+        function updatePacketSelectors() {
+            if (!result1 || !result2) return;
+
+            // Get all packet header variables
+            const dom1 = dom(result1);
+            const dom2 = dom(result2);
+            const allDomains = new Map();
+
+            // Merge domains
+            for (const [key, values] of dom1.entries()) {
+                allDomains.set(key, new Set(values));
+            }
+
+            for (const [key, values] of dom2.entries()) {
+                if (!allDomains.has(key)) {
+                    allDomains.set(key, new Set(values));
+                } else {
+                    for (const value of values) {
+                        allDomains.get(key).add(value);
+                    }
+                }
+            }
+
+            // Generate all possible packet combinations
+            allPackets = allpks(allDomains);
+
+            // Clear existing options
+            const inputSelect = document.getElementById('input-packet');
+            const outputSelect = document.getElementById('output-packet');
+            inputSelect.innerHTML = '';
+            outputSelect.innerHTML = '';
+
+            // Add empty option
+            const emptyOption = document.createElement('option');
+            emptyOption.value = '';
+            emptyOption.textContent = '-- Select a packet configuration --';
+            inputSelect.appendChild(emptyOption.cloneNode(true));
+            outputSelect.appendChild(emptyOption);
+
+            // Add option for each packet
+            allPackets.forEach((packet, index) => {
+                const pkEntries = Array.from(packet.entries());
+                const pkText = pkEntries.length > 0
+                    ? `{${pkEntries.map(([k, v]) => `${k}=${v}`).join(', ')}}`
+                    : '{empty}';
+
+                const option = document.createElement('option');
+                option.value = index;
+                option.textContent = pkText;
+
+                inputSelect.appendChild(option.cloneNode(true));
+                outputSelect.appendChild(option.cloneNode(true));
+            });
+
+            // Set default selections
+            if (allPackets.length > 0) {
+                inputSelect.value = '';
+                outputSelect.value = '';
+            }
+
+            // Update selected packets
+            selectedInputPacket = null;
+            selectedOutputPacket = null;
+        }
+
+        // Function to initialize event listeners
+        function initEventListeners() {
+            document.getElementById('update-automata').addEventListener('click', function() {
+                const inputIndex = document.getElementById('input-packet').value;
+                const outputIndex = document.getElementById('output-packet').value;
+
+                if (inputIndex !== '' && outputIndex !== '') {
+                    selectedInputPacket = allPackets[parseInt(inputIndex)];
+                    selectedOutputPacket = allPackets[parseInt(outputIndex)];
+                    updateAutomata();
+                    updateAutomataTitle();
+                }
+            });
+        }
+
+        // Function to update automata titles
+        function updateAutomataTitle() {
+            if (!selectedInputPacket || !selectedOutputPacket) {
+                document.querySelector('.graph-container:nth-child(1) .graph-title').textContent = 'Left Expression Automaton';
+                document.querySelector('.graph-container:nth-child(2) .graph-title').textContent = 'Right Expression Automaton';
+                return;
+            }
+
+            // Format packet headers using the same style as counterexamples
+            const formatPacket = (pk) => {
+                if (!pk || pk.size === 0) return 'Empty';
+
+                const entries = Array.from(pk.entries());
+                const pkHtml = entries.map(([key, value]) =>
+                    `<span class="pk-value auto-pk">${key}=${value}</span>`
+                ).join(' ');
+
+                return pkHtml;
+            };
+
+            const inputPkHtml = formatPacket(selectedInputPacket);
+            const outputPkHtml = formatPacket(selectedOutputPacket);
+
+            document.querySelector('.graph-container:nth-child(1) .graph-title').innerHTML =
+                `Left Expression Automaton (${inputPkHtml} <span class="transform-arrow">→</span> ${outputPkHtml})`;
+            document.querySelector('.graph-container:nth-child(2) .graph-title').innerHTML =
+                `Right Expression Automaton (${inputPkHtml} <span class="transform-arrow">→</span> ${outputPkHtml})`;
+        }
+
+        // Initialize event listeners when document is loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            initEventListeners();
+        });
+
+        // Function to update automata displays
+        function updateAutomata() {
+            if (!result1 || !result2 || !selectedInputPacket || !selectedOutputPacket) return;
+
+            let values = Array.from(new Set(getValues(result1).concat(getValues(result2))));
+            let automaton1 = minaut(result1, values, selectedInputPacket, selectedOutputPacket);
+            let automaton2 = minaut(result2, values, selectedInputPacket, selectedOutputPacket);
+
+            displayCy(cy1, automaton1);
+            displayCy(cy2, automaton2);
+        }
+
+        function recompute() {
+            if (!result1 || !result2) return;
+            
+            // Check if benchmark mode is enabled
+            const benchmarkMode = document.getElementById('benchmarkMode').checked;
+            
+            let values = Array.from(new Set(getValues(result1).concat(getValues(result2))));
+            
+            // Only create automata if not in benchmark mode
+            let automaton1, automaton2;
+            if (!benchmarkMode) {
+                automaton1 = minautemp(result1, values);
+                automaton2 = minautemp(result2, values);
+            }
+            
+            // Add timing measurement
+            const startTime = performance.now();
+            let [path1, respks1, path2, respks2] = decide(result1, result2);
+            const endTime = performance.now();
+            const executionTime = endTime - startTime;
+            
+            // Only log if not in benchmark mode
+            if (!benchmarkMode) {
+                console.log("path1", path1);
+                console.log("respks1", respks1);
+                console.log("path2", path2);
+                console.log("respks2", respks2);
+            }
+            
+            let comparisonSymbol = '';
+            if (path1 === false && path2 === false) {
+                comparisonSymbol = '=';
+            } else if (path1 === false) {
+                comparisonSymbol = '⊂';
+            } else if (path2 === false) {
+                comparisonSymbol = '⊃';
+            } else {
+                comparisonSymbol = '≠';
+            }
+            
+            // Display comparison result with timing information
+            document.getElementById('comparison').innerHTML = `${comparisonSymbol} <span class="timing">(${executionTime.toFixed(2)} ms)</span>`;
+
+            // Only update packet selectors if not in benchmark mode
+            if (!benchmarkMode) {
+                updatePacketSelectors();
+            }
+
+            // Helper functions for formatting and tooltips
+            function createTooltip(text, explanation) {
+                // Remove any whitespace from the text parameter if it's a string
+                if (typeof text === 'string') {
+                    text = text.trim();
+                }
+                return `<div class="tooltip-container"><span class="tooltip-text">${text}</span><div class="tooltip-content">${explanation}</div></div>`;
+            }
+
+            function formatStackValues(values) {
+                if (!values || values.length === 0) {
+                    return createTooltip('<span class="stack-value empty-stack">ε</span>', 'Empty stack (epsilon)');
+                }
+
+                const stackValues = [...values];
+                let result = '<span style="white-space: nowrap;">';
+
+                // First item is at the top of the stack
+                if (stackValues.length > 0) {
+                    const topValue = stackValues[0];
+                    result += `<div class="tooltip-container"><span class="stack-value top-of-stack">${topValue}</span><div class="tooltip-content">Top of stack</div></div>`;
+                }
+
+                // Middle values (if any)
+                for (let i = 1; i < stackValues.length - 1; i++) {
+                    result += `<span class="stack-value">${stackValues[i]}</span>`;
+                }
+
+                // Last item is at the bottom of the stack (if more than one item)
+                if (stackValues.length > 1) {
+                    const bottomValue = stackValues[stackValues.length - 1];
+                    result += `<div class="tooltip-container"><span class="stack-value bottom-of-stack">${bottomValue}</span><div class="tooltip-content">Bottom of stack</div></div>`;
+                }
+
+                return result + '</span>';
+            }
+
+            function formatPkValues(pk) {
+                if (!pk || pk.size === 0) {
+                    return createTooltip('<span class="pk-value empty-pk">∅</span>', 'Empty packet headers');
+                }
+                const entries = Array.from(pk.entries());
+                const pkValues = entries.map(([key, value]) => {
+                    let tooltip = `Packet header ${key}=${value}`;
+                    if (value === "?") {
+                        tooltip = `Packet header ${key} is uninitialized`;
+                    }
+                    return createTooltip(`<span class="pk-value">${key}=${value}</span>`, tooltip);
+                }).join('');
+
+                return `<span style="white-space: nowrap; display:inline-flex;">${pkValues}</span>`;
+            }
+
+            function formatStackStyled(stack) {
+                if (!stack || stack.length === 0) {
+                    return createTooltip('<span class="stack-value empty-stack">ε</span>', 'Empty stack (epsilon)');
+                }
+
+                if (stack.length === 1) {
+                    return createTooltip(
+                        `<span class="stack-value top-of-stack">${stack[0]}</span>`,
+                        'Top of stack'
+                    );
+                }
+
+                const stackValues = stack.map((val, idx) => {
+                    if (idx === 0) {
+                        return createTooltip(
+                            `<span class="stack-value top-of-stack">${val}</span>`,
+                            'Top of stack'
+                        );
+                    } else if (idx === stack.length - 1) {
+                        return createTooltip(
+                            `<span class="stack-value bottom-of-stack">${val}</span>`,
+                            'Bottom of stack'
+                        );
+                    } else {
+                        const ordinals = ['First', 'Second', 'Third', 'Fourth', 'Fifth', 'Sixth', 'Seventh', 'Eighth', 'Ninth', 'Tenth'];
+                        return createTooltip(`<span class="stack-value">${val}</span>`, `${ordinals[idx]} value on stack`);
+                    }
+                }).join('');
+
+                return `<span style="white-space: nowrap; display:inline-flex;">${stackValues}</span>`;
+            }
+
+            function formatCounterexample(path, respks, isLeft) {
+                if (path === false) {
+                    const direction = isLeft ? 'Left' : 'Right';
+                    const symbol = isLeft ? '⊆' : '⊆';
+                    document.getElementById(`counterexample${isLeft ? 'A' : 'B'}`).querySelector('.counterexample-content').innerHTML =
+                        `No counterexample found. ${direction} expression is a subset of or equal to ${isLeft ? 'right' : 'left'} expression.`;
+                    document.getElementById(`counterexample${isLeft ? 'A' : 'B'}`).querySelector('.counterexample-title').innerHTML =
+                        `No Counterexample (${direction} ${symbol} ${isLeft ? 'Right' : 'Left'})`;
+                    return;
+                }
+
+                let [input, output] = pathToStackPair(path);
+                let [inpk, outpk] = respks;
+
+                const condensedFormat = `<div class="condensed-counter"><span class="transform-label">Input:&nbsp;</span>${formatPkValues(inpk)}${formatStackStyled(input)}<span class="transform-arrow">&nbsp;→&nbsp;</span><span class="transform-label">Output:&nbsp;</span>${formatPkValues(outpk)}${formatStackStyled(output)}</div>`;
+
+                const content = `${condensedFormat}
+                <div>Starting with packet headers ${formatPkValues(inpk)} and input stack ${formatStackStyled(input)},
+                    the ${isLeft ? 'left' : 'right'} expression produces output stack ${formatStackStyled(output)} with packet headers ${formatPkValues(outpk)},
+                    but the ${isLeft ? 'right' : 'left'} expression does not produce this input/output combination.</div>`;
+
+                document.getElementById(`counterexample${isLeft ? 'A' : 'B'}`).querySelector('.counterexample-content').innerHTML = content;
+                document.getElementById(`counterexample${isLeft ? 'A' : 'B'}`).querySelector('.counterexample-title').innerHTML =
+                    `Counterexample (Left ${isLeft ? '⊃' : '⊂'} Right)`;
+            }
+
+            // Only format counterexamples and update cytoscape graphs if not in benchmark mode
+            if (!benchmarkMode) {
+                // Format counterexamples for both left and right cases
+                formatCounterexample(path1, respks1, true);
+                formatCounterexample(path2, respks2, false);
+                
+                // Update cytoscape graphs
+                if (automaton1 && automaton2) {
+                    displayCy(cy1, automaton1);
+                    displayCy(cy2, automaton2);
+                }
+            }
+        }
+        mkEditor('#editor1', function (result) {
+            result1 = result;
+            recompute();
+        })
+        mkEditor('#editor2', function (result) {
+            result2 = result;
+            recompute();
+        })
+    </script>
+
+    <script>
+        function initCy(id) {
+            // Create tooltip div if it doesn't exist
+            let tooltipDiv = document.getElementById('cy-tooltip');
+            if (!tooltipDiv) {
+                tooltipDiv = document.createElement('div');
+                tooltipDiv.id = 'cy-tooltip';
+                tooltipDiv.style.position = 'absolute';
+                tooltipDiv.style.display = 'none';
+                tooltipDiv.style.backgroundColor = '#34495e';
+                tooltipDiv.style.color = 'white';
+                tooltipDiv.style.padding = '8px 12px';
+                tooltipDiv.style.borderRadius = '4px';
+                tooltipDiv.style.fontSize = '13px';
+                tooltipDiv.style.pointerEvents = 'none';
+                tooltipDiv.style.zIndex = '1000';
+                tooltipDiv.style.opacity = '0';
+                tooltipDiv.style.transition = 'opacity 0.2s';
+                tooltipDiv.style.boxShadow = '0 3px 6px rgba(0,0,0,0.2)';
+                tooltipDiv.style.textAlign = 'center';
+                tooltipDiv.style.lineHeight = '1.4';
+                document.body.appendChild(tooltipDiv);
+            }
+
+            const cy = cytoscape({
+                container: document.getElementById(id),
+                elements: {
+                    nodes: [
+                        { data: { id: 'q0', label: 'q0', tooltip: 'Example state' } },
+                        { data: { id: 'q1', label: 'q1', tooltip: 'Example state' } },
+                        { data: { id: 'q2', label: 'q2', tooltip: 'Example state' } }
+                    ],
+                    edges: [
+                        { data: { source: 'q0', target: 'q0', label: 'push(0)' } },
+                        { data: { source: 'q0', target: 'q1', label: 'push(1)' } },
+                        { data: { source: 'q1', target: 'q0', label: 'push(0)' } },
+                        { data: { source: 'q1', target: 'q1', label: 'push(1)' } },
+                        { data: { source: 'q1', target: 'q2', label: 'push(0)' } },
+                        { data: { source: 'q2', target: 'q0', label: 'push(0)' } },
+                        { data: { source: 'q2', target: 'q1', label: 'push(1)' } }
+                    ]
+                },
+                style: [
+                    {
+                        selector: 'node',
+                        style: {
+                            'label': 'data(label)',
+                            'text-valign': 'center',
+                            'text-halign': 'center',
+                            'width': '20px',
+                            'height': '20px',
+                            'font-size': '18px',
+                            'border-width': '2px',
+                            'border-color': '#fff',
+                            'background-color': '#3498db',
+                        },
+                    },
+                    {
+                        selector: '.accept',
+                        style: {
+                            'background-color': '#fff',
+                            'border-color': '#3498db',
+                            'border-width': '3px',
+                        }
+                    },
+                    {
+                        selector: '.start',
+                        style: {
+                            'background-color': '#2ecc71',
+                        }
+                    },
+                    {
+                        selector: 'edge',
+                        style: {
+                            'width': 2,
+                            'line-color': '#95a5a6',
+                            'target-arrow-color': '#7f8c8d',
+                            'target-arrow-shape': 'triangle',
+                            'arrow-scale': 1,
+                            'target-distance-from-node': 2,
+                            'curve-style': 'bezier',
+                            'control-point-step-size': 60,
+                            'label': 'data(label)',
+                            'text-rotation': 'autorotate',
+                            'font-size': '16px',
+                            'text-outline-width': 4,
+                            'text-outline-color': '#fff',
+                            'color': '#34495e',
+                            'text-margin-y': -6,
+                        }
+                    }
+                ],
+                layout: {
+                    name: 'cose',
+                }
+            });
+            return cy;
+        }
+        var cy1 = initCy('cy1');
+        var cy2 = initCy('cy2');
+    </script>
+</body>
+
+</html>
