@@ -16,7 +16,59 @@
             <!-- Slide 1: Title slide introducing StacKAT -->
             <section class="title-slide" data-transition="fade">
                 <div style="margin-top: 50px">
-                <h1 style="font-size: 2.2em; margin-bottom: 0.3em;">StacKAT: Infinite-State Network Verification</h1>
+                <h1 style="font-size: 2.2em; margin-bottom: 0.3em;">StacKAT
+                    <svg width="80" height="80" viewBox="0 0 40 40" style="margin-right: 10px; vertical-align: middle; cursor: pointer; margin-top: -20px;" id="cat-logo">
+                        <!-- Stack layers with gradient and shadow -->
+                        <defs>
+                            <linearGradient id="stackGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                                <stop offset="0%" style="stop-color:#6c757d;stop-opacity:1" />
+                                <stop offset="100%" style="stop-color:#495057;stop-opacity:1" />
+                            </linearGradient>
+                        </defs>
+        
+                        <!-- Base shadow -->
+                        <rect x="12" y="30" width="16" height="4" fill="#00000033" rx="1"/>
+        
+                        <!-- Stack layers with depth effect -->
+                        <rect x="8" y="26" width="24" height="6" fill="url(#stackGradient)" rx="2"
+                              stroke="#343a40" stroke-width="1"/>
+                        <rect x="10" y="18" width="20" height="6" fill="url(#stackGradient)" rx="2"
+                              stroke="#343a40" stroke-width="1"/>
+                        <rect x="12" y="10" width="16" height="6" fill="url(#stackGradient)" rx="2"
+                              stroke="#343a40" stroke-width="1"/>
+                        <!-- Cat feet with gradient -->
+                        <!-- Left foot -->
+                        <rect x="12" y="34" width="6" height="4" fill="url(#stackGradient)" rx="2"
+                              stroke="#343a40" stroke-width="1"/>
+        
+                        <!-- Right foot -->
+                        <rect x="22" y="34" width="6" height="4" fill="url(#stackGradient)" rx="2"
+                              stroke="#343a40" stroke-width="1"/>
+        
+                        <!-- Cat ears with gradient -->
+                        <!-- Left ear -->
+                        <rect x="12" y="4.5" width="6" height="4" fill="url(#stackGradient)" rx="2"
+                              stroke="#343a40" stroke-width="1"/>
+        
+                        <!-- Right ear -->
+                        <rect x="22" y="4.5" width="6" height="4" fill="url(#stackGradient)" rx="2"
+                              stroke="#343a40" stroke-width="1"/>
+        
+                        <!-- Cat eyes -->
+                        <circle cx="16" cy="14" r="2" fill="white"/>
+                        <circle cx="24" cy="14" r="2" fill="white"/>
+                        <!-- Cat pupils -->
+                        <circle cx="16" cy="14" r="0.75" fill="#343a40"/>
+                        <circle cx="24" cy="14" r="0.75" fill="#343a40"/>
+        
+                        <!-- Whiskers -->
+                        <line x1="8" y1="15" x2="14" y2="14" stroke="#343a40" stroke-width="0.5"/>
+                        <line x1="8" y1="17" x2="14" y2="16" stroke="#343a40" stroke-width="0.5"/>
+                        <line x1="32" y1="15" x2="26" y2="14" stroke="#343a40" stroke-width="0.5"/>
+                        <line x1="32" y1="17" x2="26" y2="16" stroke="#343a40" stroke-width="0.5"/>
+                    </svg>
+                </h1>
+                <h2>Infinite-State Network Verification</h2>
                 <h4 style="font-size: 1em; margin-bottom: 1em;">PLDI 2025</h4>
                 <!-- <h4 style="font-size: 0.8em; margin-bottom: 0.4em;"><a href="https://doi.org/10.1145/3729257">https://doi.org/10.1145/3729257</a></h4> -->
                 <p class="authors" style="font-size: 0.8em; line-height: 1.4; display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
@@ -32,6 +84,7 @@
                         Jana Wagemaker (Radboud)
                     </span>
                 </p>
+                <a href="https://netkat.org/stackat" style="font-size: 2rem; margin-top: 60px; display: block">netkat.org/stackat</a> 
                 </div>
             </section>
 
@@ -1308,6 +1361,19 @@
 
         </div>
     </div>
+
+    <script>
+        // Add event listener to cat logo and initialize results when WASM is loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            const catLogo = document.getElementById('cat-logo');
+            if (catLogo) {
+                catLogo.addEventListener('mousedown', function() {
+                    window.location.href = "https://netkat.org/stackat";
+                });
+                catLogo.title = "Go to playground";
+            }
+        });
+    </script>
 
     <!-- Reveal.js dependencies -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/5.0.4/reveal.min.js"></script>
