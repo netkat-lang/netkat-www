@@ -73,7 +73,7 @@
             animation: bounce 0.5s ease;
         }
 
-        .header .toprightlink {
+        .header #links {
             position: absolute;
             right: 10px;
             top: 10px;
@@ -635,7 +635,11 @@
 <body>
     <div class="container">
         <div class="header">
-        <a href="stackatv1.html" class="toprightlink">Switch to JS version</a>
+        <span id="links">
+            <a href="stackatv1.html" class="toprightlink">JS version</a> | 
+            <a href="stackat.pdf" class="toprightlink">Paper</a> |
+            <a href="slides/slides.html" class="toprightlink">Slides</a>
+        </span>
         <h1>
             StacKAT
             <svg width="40" height="40" viewBox="0 0 40 40" style="margin-right: 10px; vertical-align: middle; cursor: pointer;" id="cat-logo">
